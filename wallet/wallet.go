@@ -13,7 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto/sha3"
 	log "github.com/sirupsen/logrus"
 
-	"ethwallet/util"
+	"github.com/OpenBazaar/go-ethwallet/util"
 )
 
 // EthereumWallet is the wallet implementation for ethereum
