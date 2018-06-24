@@ -10,14 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
-// KeyPurpose indicates the context in which the key value will be used
-type KeyPurpose int
-
-const (
-	EXTERNAL KeyPurpose = 0
-	INTERNAL            = 1
-)
-
 // EthAddress implements the WalletAddress interface
 type EthAddress struct {
 	address *common.Address

@@ -108,7 +108,9 @@ func main() {
 	fmt.Println("after transfer : ")
 	fmt.Println("Dest balance ")
 	fmt.Println(destWallet.GetBalance())
+	fmt.Println(destWallet.Balance())
 	fmt.Println("Source balance ")
 	fmt.Println(myWallet.GetBalance())
+	fmt.Println(myWallet.Balance())
 
 }
