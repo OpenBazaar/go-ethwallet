@@ -25,6 +25,7 @@ type EthereumWallet struct {
 	client  *EthClient
 	account *Account
 	address *EthAddress
+	service *Service
 }
 
 // NewEthereumWallet will return a reference to the Eth Wallet
@@ -40,7 +41,7 @@ func NewEthereumWallet(url, keyFile, passwd string) *EthereumWallet {
 	}
 	addr := myAccount.Address()
 
-	return &EthereumWallet{client, myAccount, &EthAddress{&addr}}
+	return &EthereumWallet{client, myAccount, &EthAddress{&addr}, &Service{}}
 }
 
 // GetBalance returns the balance for the wallet
