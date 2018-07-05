@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 	"time"
@@ -11,6 +12,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
+
+	"github.com/OpenBazaar/go-ethwallet/util"
 )
 
 // EthClient represents the eth client
@@ -99,6 +102,10 @@ func (client *EthClient) GetLatestBlock() (uint32, string, error) {
 // EstimateTxnGas - returns estimated gas
 func (client *EthClient) EstimateTxnGas(from, to common.Address, value *big.Int) (*big.Int, error) {
 	gas := big.NewInt(0)
+	if !(util.IsValidAddress(from.String()) && util.IsValidAddress(to.String())) {
+		return gas, errors.New("invalid address")
+	}
+
 	gasPrice, err := client.SuggestGasPrice(context.Background())
 	if err != nil {
 		return gas, err
