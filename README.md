@@ -1,4 +1,4 @@
-# openbazaar-go
+# go-ethwallet
 ![banner](https://i.imgur.com/iOnXDXK.png)
 OpenBazaar Ethereum Wallet in Go
 
