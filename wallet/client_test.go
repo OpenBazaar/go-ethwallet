@@ -369,6 +369,9 @@ func TestTransfer(t *testing.T) {
 	}
 	addr := common.StringToAddress(validSourceAddress)
 	account, err := NewAccount("../test/UTC--2018-06-16T18-41-19.615987160Z--c0b4ef9e9d2806f643be94d2434e5c3d5cecd255", "hotpotato")
+	if err != nil {
+		t.Errorf("account should have initialized")
+	}
 	dest := common.StringToAddress(validDestinationAddress)
 	value := big.NewInt(200000)
 

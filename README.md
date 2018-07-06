@@ -1,3 +1,12 @@
+# openbazaar-go
+![banner](https://i.imgur.com/iOnXDXK.png)
+OpenBazaar Ethereum Wallet in Go
+
+[![Build Status](https://travis-ci.org/OpenBazaar/go-ethwallet.svg?branch=master)](https://travis-ci.org/OpenBazaar/go-ethwallet)
+[![Coverage Status](https://coveralls.io/repos/github/OpenBazaar/go-ethwallet/badge.svg?branch=master)](https://coveralls.io/github/OpenBazaar/go-ethwallet?branch=master)
+[![Go Report Card](https://goreportcard.com/badge/github.com/OpenBazaar/go-ethwallet)](https://goreportcard.com/report/github.com/OpenBazaar/go-ethwallet)
+
+
 This is a ethereum wallet implementation which uses Infura API.
 
 Infura API key is required as an environment variable. Refer the
