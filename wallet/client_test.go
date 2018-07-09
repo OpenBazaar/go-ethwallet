@@ -363,6 +363,7 @@ func TestInvalidGetTransaction(t *testing.T) {
 }
 
 func TestTransfer(t *testing.T) {
+	//t.SkipNow()
 	client, err := NewEthClient(ropstenURL)
 	if err != nil {
 		t.Errorf("client should have initialized")
@@ -379,13 +380,11 @@ func TestTransfer(t *testing.T) {
 	var txn *types.Transaction
 
 	bal1, err = client.GetBalance(addr)
-	fmt.Println("bal1 : ", bal1, "  err : ", err)
 	if err != nil || bal1 == nil {
 		t.Errorf("client should have fetched balance")
 	}
 
 	bal2, err = client.GetUnconfirmedBalance(addr)
-	fmt.Println("bal2 : ", bal2, "  err : ", err)
 	if err != nil || bal2 == nil {
 		t.Errorf("client should have fetched balance")
 	}
