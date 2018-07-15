@@ -1,11 +1,17 @@
 package wallet
 
 import (
+	"bytes"
+	"context"
 	"crypto/ecdsa"
+	"encoding/gob"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"math/big"
 	"time"
+
+	"go-ethereum/accounts/abi/bind"
 
 	wi "github.com/OpenBazaar/wallet-interface"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -16,9 +22,41 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/sha3"
 	log "github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v2"
 
 	"github.com/OpenBazaar/go-ethwallet/util"
 )
+
+// EthConfiguration - used for eth specific configuration
+type EthConfiguration struct {
+	RopstenPPAddress string `yaml:"ROPSTEN_PPv2_ADDRESS"`
+}
+
+// EthRedeemScript - used to represent redeem script for eth wallet
+type EthRedeemScript struct {
+	TxnID     common.Address
+	Threshold uint8
+	Timeout   uint32
+	Buyer     common.Address
+	Seller    common.Address
+	Moderator common.Address
+}
+
+// SerializeEthScript - used to serialize eth redeem script
+func SerializeEthScript(scrpt EthRedeemScript) ([]byte, error) {
+	b := bytes.Buffer{}
+	e := gob.NewEncoder(&b)
+	err := e.Encode(scrpt)
+	return b.Bytes(), err
+}
+
+// DeserializeEthScript - used to deserialize eth redeem script
+func DeserializeEthScript(b []byte) (EthRedeemScript, error) {
+	scrpt := EthRedeemScript{}
+	d := gob.NewDecoder(&b)
+	err := d.Decode(&scrpt)
+	return scrpt, err
+}
 
 // EthereumWallet is the wallet implementation for ethereum
 type EthereumWallet struct {
@@ -26,6 +64,7 @@ type EthereumWallet struct {
 	account *Account
 	address *EthAddress
 	service *Service
+	ppsct   *Wallet
 }
 
 // NewEthereumWallet will return a reference to the Eth Wallet
@@ -41,7 +80,22 @@ func NewEthereumWallet(url, keyFile, passwd string) *EthereumWallet {
 	}
 	addr := myAccount.Address()
 
-	return &EthereumWallet{client, myAccount, &EthAddress{&addr}, &Service{}}
+	conf, err := ioutil.ReadFile("../configuration.yaml")
+	if err != nil {
+		log.Fatalf("ethereum config not found: %s", err.Error())
+	}
+	ethConfig := EthConfiguration{}
+	err = yaml.Unmarshal(conf, &ethConfig)
+	if err != nil {
+		log.Fatalf("ethereum config not valid: %s", err.Error())
+	}
+
+	smtct, err := NewWallet(common.StringToAddress(ethConfig.RopstenPPAddress), client)
+	if err != nil {
+		log.Fatalf("error initilaizing contract failed: %s", err.Error())
+	}
+
+	return &EthereumWallet{client, myAccount, &EthAddress{&addr}, &Service{}, smtct}
 }
 
 // GetBalance returns the balance for the wallet
@@ -203,6 +257,90 @@ func (wallet *EthereumWallet) EstimateSpendFee(amount int64, feeLevel wi.FeeLeve
 // SweepAddress - Build and broadcast a transaction that sweeps all coins from an address. If it is a p2sh multisig, the redeemScript must be included
 func (wallet *EthereumWallet) SweepAddress(utxos []wi.Utxo, address *wi.WalletAddress, key *hd.ExtendedKey, redeemScript *[]byte, feeLevel wi.FeeLevel) (*chainhash.Hash, error) {
 	return chainhash.NewHashFromStr("")
+}
+
+// GenerateMultisigScript - Generate a multisig script from public keys. If a timeout is included the returned script should be a timelocked escrow which releases using the timeoutKey.
+func (wallet *EthereumWallet) GenerateMultisigScript(keys []hd.ExtendedKey, threshold int, timeout time.Duration, timeoutKey *hd.ExtendedKey) (addr wi.WalletAddress, redeemScript []byte, err error) {
+	if uint32(timeout.Hours()) > 0 && timeoutKey == nil {
+		return nil, nil, errors.New("Timeout key must be non nil when using an escrow timeout")
+	}
+
+	if len(keys) < threshold {
+		return nil, nil, fmt.Errorf("unable to generate multisig script with "+
+			"%d required signatures when there are only %d public "+
+			"keys available", threshold, len(keys))
+	}
+
+	if len(keys) < 2 {
+		return nil, nil, fmt.Errorf("unable to generate multisig script with "+
+			"%d required signatures when there are only %d public "+
+			"keys available", threshold, len(keys))
+	}
+
+	var ecKeys []*common.Address
+	for _, key := range keys {
+		ecKey, err := key.ECPubKey()
+		if err != nil {
+			return nil, nil, err
+		}
+		ecKeys = append(ecKeys, common.BytesToAddress(ecKey.SerializeUncompressed()))
+	}
+
+	builder := EthRedeemScript{}
+	builder.Timeout = uint32(timeout.Hours())
+	builder.Threshold = uint8(threshold)
+	builder.Buyer = ecKeys[0]
+	builder.Seller = ecKeys[1]
+	if threshold > 1 {
+		builder.Moderator = ecKeys[2]
+	}
+	switch threshold {
+	case 1:
+		{
+			// Seller is offline
+		}
+	case 2:
+		{
+			// Moderated payment
+		}
+	default:
+		{
+			// handle this
+		}
+	}
+
+	redeemScript, err = SerializeEthScript(builder)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	hash := sha3.NewKeccak256()
+	hash.Write(redeemScript)
+	addr := common.StringToAddress(hexutil.Encode(hash.Sum(nil)[:]))
+
+	fromAddress := wallet.account.Address()
+	nonce, err := wallet.client.PendingNonceAt(context.Background(), fromAddress)
+	if err != nil {
+		log.Fatal(err)
+	}
+	gasPrice, err := wallet.client.SuggestGasPrice(context.Background())
+	if err != nil {
+		log.Fatal(err)
+	}
+	auth := bind.NewKeyedTransactor(wallet.account.key.PrivateKey)
+
+	auth.Nonce = big.NewInt(int64(nonce))
+	auth.Value = big.NewInt(0)     // in wei
+	auth.GasLimit = uint64(300000) // in units
+	auth.GasPrice = gasPrice
+
+	tx, err := wallet.ppsct.AddTransaction(auth, builder.Buyer, builder.Seller,
+		[]common.Address{builder.Moderator}, builder.Threshold,
+		builder.Timeout, addr.Bytes())
+	fmt.Println(tx)
+	fmt.Println(err)
+
+	return addr, redeemScript, nil
 }
 
 // AddWatchedAddress - Add a script to the wallet and get notifications back when coins are received or spent from it
