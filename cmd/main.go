@@ -12,7 +12,7 @@ import (
 	_ "github.com/joho/godotenv/autoload"
 	log "github.com/sirupsen/logrus"
 
-	"ethwallet/wallet"
+	"github.com/OpenBazaar/go-ethwallet/wallet"
 )
 
 var (
@@ -113,4 +113,5 @@ func main() {
 	fmt.Println(myWallet.GetBalance())
 	fmt.Println(myWallet.Balance())
 
+	fmt.Println(myWallet.CreateAddress())
 }

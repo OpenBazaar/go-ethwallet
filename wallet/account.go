@@ -16,17 +16,17 @@ type EthAddress struct {
 }
 
 // String representation of eth address
-func (addr *EthAddress) String() string {
+func (addr EthAddress) String() string {
 	return addr.address.String()
 }
 
 // EncodeAddress returns hex representation of the address
-func (addr *EthAddress) EncodeAddress() string {
+func (addr EthAddress) EncodeAddress() string {
 	return addr.address.Hex()
 }
 
 // ScriptAddress returns byte representation of address
-func (addr *EthAddress) ScriptAddress() []byte {
+func (addr EthAddress) ScriptAddress() []byte {
 	return addr.address.Bytes()
 }
 

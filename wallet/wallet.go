@@ -11,16 +11,16 @@ import (
 	"math/big"
 	"time"
 
-	"go-ethereum/accounts/abi/bind"
-
 	wi "github.com/OpenBazaar/wallet-interface"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	hd "github.com/btcsuite/btcutil/hdkeychain"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/sha3"
+	"github.com/rs/xid"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 
@@ -53,7 +53,8 @@ func SerializeEthScript(scrpt EthRedeemScript) ([]byte, error) {
 // DeserializeEthScript - used to deserialize eth redeem script
 func DeserializeEthScript(b []byte) (EthRedeemScript, error) {
 	scrpt := EthRedeemScript{}
-	d := gob.NewDecoder(&b)
+	buf := bytes.NewBuffer(b)
+	d := gob.NewDecoder(buf)
 	err := d.Decode(&scrpt)
 	return scrpt, err
 }
@@ -80,7 +81,7 @@ func NewEthereumWallet(url, keyFile, passwd string) *EthereumWallet {
 	}
 	addr := myAccount.Address()
 
-	conf, err := ioutil.ReadFile("../configuration.yaml")
+	conf, err := ioutil.ReadFile("./configuration.yaml")
 	if err != nil {
 		log.Fatalf("ethereum config not found: %s", err.Error())
 	}
@@ -260,7 +261,7 @@ func (wallet *EthereumWallet) SweepAddress(utxos []wi.Utxo, address *wi.WalletAd
 }
 
 // GenerateMultisigScript - Generate a multisig script from public keys. If a timeout is included the returned script should be a timelocked escrow which releases using the timeoutKey.
-func (wallet *EthereumWallet) GenerateMultisigScript(keys []hd.ExtendedKey, threshold int, timeout time.Duration, timeoutKey *hd.ExtendedKey) (addr wi.WalletAddress, redeemScript []byte, err error) {
+func (wallet *EthereumWallet) GenerateMultisigScript(keys []hd.ExtendedKey, threshold int, timeout time.Duration, timeoutKey *hd.ExtendedKey) (wi.WalletAddress, []byte, error) {
 	if uint32(timeout.Hours()) > 0 && timeoutKey == nil {
 		return nil, nil, errors.New("Timeout key must be non nil when using an escrow timeout")
 	}
@@ -277,7 +278,7 @@ func (wallet *EthereumWallet) GenerateMultisigScript(keys []hd.ExtendedKey, thre
 			"keys available", threshold, len(keys))
 	}
 
-	var ecKeys []*common.Address
+	var ecKeys []common.Address
 	for _, key := range keys {
 		ecKey, err := key.ECPubKey()
 		if err != nil {
@@ -287,10 +288,13 @@ func (wallet *EthereumWallet) GenerateMultisigScript(keys []hd.ExtendedKey, thre
 	}
 
 	builder := EthRedeemScript{}
+
+	builder.TxnID = common.StringToAddress(xid.New().String() + xid.New().String())
 	builder.Timeout = uint32(timeout.Hours())
 	builder.Threshold = uint8(threshold)
 	builder.Buyer = ecKeys[0]
 	builder.Seller = ecKeys[1]
+
 	if threshold > 1 {
 		builder.Moderator = ecKeys[2]
 	}
@@ -309,7 +313,7 @@ func (wallet *EthereumWallet) GenerateMultisigScript(keys []hd.ExtendedKey, thre
 		}
 	}
 
-	redeemScript, err = SerializeEthScript(builder)
+	redeemScript, err := SerializeEthScript(builder)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -317,6 +321,9 @@ func (wallet *EthereumWallet) GenerateMultisigScript(keys []hd.ExtendedKey, thre
 	hash := sha3.NewKeccak256()
 	hash.Write(redeemScript)
 	addr := common.StringToAddress(hexutil.Encode(hash.Sum(nil)[:]))
+	retAddr := EthAddress{&addr}
+	var shash [32]byte
+	copy(shash[:], addr.Bytes())
 
 	fromAddress := wallet.account.Address()
 	nonce, err := wallet.client.PendingNonceAt(context.Background(), fromAddress)
@@ -330,17 +337,17 @@ func (wallet *EthereumWallet) GenerateMultisigScript(keys []hd.ExtendedKey, thre
 	auth := bind.NewKeyedTransactor(wallet.account.key.PrivateKey)
 
 	auth.Nonce = big.NewInt(int64(nonce))
-	auth.Value = big.NewInt(0)     // in wei
-	auth.GasLimit = uint64(300000) // in units
+	auth.Value = big.NewInt(0)         // in wei
+	auth.GasLimit = big.NewInt(300000) // in units
 	auth.GasPrice = gasPrice
 
 	tx, err := wallet.ppsct.AddTransaction(auth, builder.Buyer, builder.Seller,
 		[]common.Address{builder.Moderator}, builder.Threshold,
-		builder.Timeout, addr.Bytes())
+		builder.Timeout, shash)
 	fmt.Println(tx)
 	fmt.Println(err)
 
-	return addr, redeemScript, nil
+	return retAddr, redeemScript, nil
 }
 
 // AddWatchedAddress - Add a script to the wallet and get notifications back when coins are received or spent from it
@@ -366,6 +373,18 @@ func (wallet *EthereumWallet) GetConfirmations(txid chainhash.Hash) (confirms, a
 // Close will stop the wallet daemon
 func (wallet *EthereumWallet) Close() {
 	// stop the wallet daemon
+}
+
+// CreateAddress - used to generate a new address
+func (wallet *EthereumWallet) CreateAddress() (common.Address, error) {
+	fromAddress := wallet.account.Address()
+	nonce, err := wallet.client.PendingNonceAt(context.Background(), fromAddress)
+	if err != nil {
+		fmt.Println(err)
+	}
+	addr := crypto.CreateAddress(fromAddress, nonce)
+	//fmt.Println("Addr : ", addr.String())
+	return addr, err
 }
 
 // GenWallet creates a wallet
