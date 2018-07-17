@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/big"
+	"path"
+	"runtime"
 	"time"
 
 	wi "github.com/OpenBazaar/wallet-interface"
@@ -81,7 +83,9 @@ func NewEthereumWallet(url, keyFile, passwd string) *EthereumWallet {
 	}
 	addr := myAccount.Address()
 
-	conf, err := ioutil.ReadFile("./configuration.yaml")
+	_, filename, _, _ := runtime.Caller(0)
+	conf, err := ioutil.ReadFile(path.Join(path.Dir(filename), "../configuration.yaml"))
+
 	if err != nil {
 		log.Fatalf("ethereum config not found: %s", err.Error())
 	}
@@ -91,7 +95,7 @@ func NewEthereumWallet(url, keyFile, passwd string) *EthereumWallet {
 		log.Fatalf("ethereum config not valid: %s", err.Error())
 	}
 
-	smtct, err := NewWallet(common.StringToAddress(ethConfig.RopstenPPAddress), client)
+	smtct, err := NewWallet(common.HexToAddress(ethConfig.RopstenPPAddress), client)
 	if err != nil {
 		log.Fatalf("error initilaizing contract failed: %s", err.Error())
 	}
@@ -220,7 +224,7 @@ func (wallet *EthereumWallet) GetFeePerByte(feeLevel wi.FeeLevel) uint64 {
 	return 0
 }
 
-// Spend - Send bitcoins to an external wallet
+// Spend - Send ether to an external wallet
 func (wallet *EthereumWallet) Spend(amount int64, addr wi.WalletAddress, feeLevel wi.FeeLevel) (*chainhash.Hash, error) {
 	hash, err := wallet.Transfer(addr.String(), big.NewInt(amount))
 	var h *chainhash.Hash
@@ -240,7 +244,7 @@ func (wallet *EthereumWallet) EstimateFee(ins []wi.TransactionInput, outs []wi.T
 	sum := big.NewInt(0)
 	for _, out := range outs {
 		gas, err := wallet.client.EstimateTxnGas(wallet.account.Address(),
-			common.StringToAddress(out.Address.String()), big.NewInt(out.Value))
+			common.HexToAddress(out.Address.String()), big.NewInt(out.Value))
 		if err != nil {
 			return sum.Uint64()
 		}

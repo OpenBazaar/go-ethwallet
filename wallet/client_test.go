@@ -238,8 +238,8 @@ func TestEstimateTxnGas(t *testing.T) {
 	setup()
 	t.Parallel()
 
-	addr := common.StringToAddress(validSourceAddress)
-	dest := common.StringToAddress(validDestinationAddress)
+	addr := common.HexToAddress(validSourceAddress)
+	dest := common.HexToAddress(validDestinationAddress)
 	value := big.NewInt(200000)
 
 	for baseURL := range validurlsTest {
@@ -280,7 +280,7 @@ func TestEstimateGasSpend(t *testing.T) {
 	setup()
 	t.Parallel()
 
-	addr := common.StringToAddress(validSourceAddress)
+	addr := common.HexToAddress(validSourceAddress)
 	value := big.NewInt(200000)
 
 	for baseURL := range validurlsTest {
@@ -368,12 +368,12 @@ func TestTransfer(t *testing.T) {
 	if err != nil {
 		t.Errorf("client should have initialized")
 	}
-	addr := common.StringToAddress(validSourceAddress)
+	addr := common.HexToAddress(validSourceAddress)
 	account, err := NewAccount("../test/UTC--2018-06-16T18-41-19.615987160Z--c0b4ef9e9d2806f643be94d2434e5c3d5cecd255", "hotpotato")
 	if err != nil {
 		t.Errorf("account should have initialized")
 	}
-	dest := common.StringToAddress(validDestinationAddress)
+	dest := common.HexToAddress(validDestinationAddress)
 	value := big.NewInt(200000)
 
 	var bal1, bal2, sbal1, dbal1, sbal2, dbal2, val *big.Int
@@ -411,7 +411,7 @@ func TestTransfer(t *testing.T) {
 
 	hash, err := client.Transfer(account, dest, value)
 	if err != nil {
-		t.Errorf("client should transfer")
+		t.Errorf("client should transfer : %v", err)
 	}
 
 	txn, _, err = client.GetTransaction(hash)
