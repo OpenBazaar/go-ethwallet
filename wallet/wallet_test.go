@@ -1,6 +1,7 @@
 package wallet
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"math/big"
@@ -11,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/rs/xid"
 	log "github.com/sirupsen/logrus"
@@ -190,9 +192,22 @@ func TestWalletContractAddTransaction(t *testing.T) {
 
 	hash := sha3.NewKeccak256()
 	hash.Write(redeemScript)
-	addr := common.StringToAddress(hexutil.Encode(hash.Sum(nil)[:]))
+	hashStr := hexutil.Encode(hash.Sum(nil)[:])
+	shash1 := crypto.Keccak256(redeemScript)
+	shash1Str := hexutil.Encode(shash1)
+	fmt.Println("hashStr : ", hashStr)
+	fmt.Println("shash1Str : ", shash1Str)
+	addr := common.HexToAddress(hashStr)
 	var shash [32]byte
 	copy(shash[:], addr.Bytes())
+
+	var s1 [32]byte
+	var s2 [32]byte
+
+	copy(s1[:], hash.Sum(nil)[:])
+	copy(s2[:], shash1)
+
+	fmt.Println("s1 and s2 are equal? : ", bytes.Equal(s1[:], s2[:]))
 
 	fromAddress := validRopstenWallet.account.Address()
 	nonce, err := validRopstenWallet.client.PendingNonceAt(context.Background(), fromAddress)
@@ -206,8 +221,8 @@ func TestWalletContractAddTransaction(t *testing.T) {
 	auth := bind.NewKeyedTransactor(validRopstenWallet.account.key.PrivateKey)
 
 	auth.Nonce = big.NewInt(int64(nonce))
-	auth.Value = big.NewInt(66778899)  // in wei
-	auth.GasLimit = big.NewInt(300000) // in units
+	auth.Value = big.NewInt(66778899)   // in wei
+	auth.GasLimit = big.NewInt(4000000) // in units
 	auth.GasPrice = gasPrice
 
 	fmt.Println("buyer : ", script.Buyer)
@@ -217,8 +232,18 @@ func TestWalletContractAddTransaction(t *testing.T) {
 	fmt.Println("timeout : ", script.Timeout)
 	fmt.Println("scrptHash : ", shash)
 
-	tx, err := validRopstenWallet.ppsct.AddTransaction(auth, script.Buyer, script.Seller,
-		[]common.Address{script.Moderator}, script.Threshold, script.Timeout, shash)
-	fmt.Println(tx)
-	fmt.Println(err)
+	/*
+		var tx *types.Transaction
+
+		if script.Threshold == 1 {
+			tx, err = validRopstenWallet.ppsct.AddTransaction(auth, script.Buyer, script.Seller,
+				[]common.Address{}, script.Threshold, script.Timeout, shash)
+		} else {
+			tx, err = validRopstenWallet.ppsct.AddTransaction(auth, script.Buyer, script.Seller,
+				[]common.Address{script.Moderator}, script.Threshold, script.Timeout, shash)
+		}
+
+		fmt.Println(tx)
+		fmt.Println(err)
+	*/
 }

@@ -20,6 +20,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/rs/xid"
@@ -327,7 +328,7 @@ func (wallet *EthereumWallet) GenerateMultisigScript(keys []hd.ExtendedKey, thre
 	addr := common.StringToAddress(hexutil.Encode(hash.Sum(nil)[:]))
 	retAddr := EthAddress{&addr}
 	var shash [32]byte
-	copy(shash[:], addr.Bytes())
+	copy(shash[:], hash.Sum(nil)[:])
 
 	fromAddress := wallet.account.Address()
 	nonce, err := wallet.client.PendingNonceAt(context.Background(), fromAddress)
@@ -341,17 +342,127 @@ func (wallet *EthereumWallet) GenerateMultisigScript(keys []hd.ExtendedKey, thre
 	auth := bind.NewKeyedTransactor(wallet.account.key.PrivateKey)
 
 	auth.Nonce = big.NewInt(int64(nonce))
-	auth.Value = big.NewInt(0)         // in wei
-	auth.GasLimit = big.NewInt(300000) // in units
+	auth.Value = big.NewInt(0)          // in wei
+	auth.GasLimit = big.NewInt(4000000) // in units
 	auth.GasPrice = gasPrice
 
-	tx, err := wallet.ppsct.AddTransaction(auth, builder.Buyer, builder.Seller,
-		[]common.Address{builder.Moderator}, builder.Threshold,
-		builder.Timeout, shash)
+	var tx *types.Transaction
+
+	if builder.Threshold == 1 {
+		tx, err = wallet.ppsct.AddTransaction(auth, builder.Buyer, builder.Seller,
+			[]common.Address{}, builder.Threshold,
+			builder.Timeout, shash)
+	} else {
+		tx, err = wallet.ppsct.AddTransaction(auth, builder.Buyer, builder.Seller,
+			[]common.Address{builder.Moderator}, builder.Threshold,
+			builder.Timeout, shash)
+	}
+
 	fmt.Println(tx)
 	fmt.Println(err)
 
 	return retAddr, redeemScript, nil
+}
+
+// CreateMultisigSignature - Create a signature for a multisig transaction
+func (wallet *EthereumWallet) CreateMultisigSignature(ins []wi.TransactionInput, outs []wi.TransactionOutput, key *hd.ExtendedKey, redeemScript []byte, feePerByte uint64) ([]wi.Signature, error) {
+
+	var sigs []wi.Signature
+	shash := crypto.Keccak256(redeemScript)
+
+	sig, err := crypto.Sign(shash, wallet.account.key.PrivateKey)
+	if err != nil {
+		log.Errorf("error signing in createmultisig : %v", err)
+	}
+	sigs = append(sigs, wi.Signature{InputIndex: 1, Signature: sig})
+
+	return sigs, err
+}
+
+// Multisign - Combine signatures and optionally broadcast
+func (wallet *EthereumWallet) Multisign(ins []wi.TransactionInput, outs []wi.TransactionOutput, sigs1 []wi.Signature, sigs2 []wi.Signature, redeemScript []byte, feePerByte uint64, broadcast bool) ([]byte, error) {
+
+	var buf bytes.Buffer
+
+	payables := make(map[string]*big.Int)
+	for _, out := range outs {
+		val := big.NewInt(out.Value)
+		if p, ok := payables[out.Address.String()]; ok {
+			sum := big.NewInt(0)
+			sum.Add(val, p)
+			payables[out.Address.String()] = sum
+		} else {
+			payables[out.Address.String()] = val
+		}
+	}
+
+	rSlice := make([][32]byte, 2)
+	sSlice := make([][32]byte, 2)
+	vSlice := make([]uint8, 2)
+
+	r := [32]byte{}
+	s := [32]byte{}
+	v := uint8(0)
+
+	if len(sigs1[0].Signature) > 0 {
+		r, s, v = util.SigRSV(sigs1[0].Signature)
+		rSlice = append(rSlice, r)
+		sSlice = append(sSlice, s)
+		vSlice = append(vSlice, v)
+	}
+
+	r = [32]byte{}
+	s = [32]byte{}
+	v = uint8(0)
+
+	if len(sigs2[0].Signature) > 0 {
+		r, s, v = util.SigRSV(sigs2[0].Signature)
+		rSlice = append(rSlice, r)
+		sSlice = append(sSlice, s)
+		vSlice = append(vSlice, v)
+	}
+
+	hash := crypto.Keccak256(redeemScript)
+	var shash [32]byte
+	copy(shash[:], hash)
+
+	rScript, err := DeserializeEthScript(redeemScript)
+	if err != nil {
+		return nil, err
+	}
+
+	destinations := []common.Address{}
+	amounts := []*big.Int{}
+
+	for k, v := range payables {
+		destinations = append(destinations, common.HexToAddress(k))
+		amounts = append(amounts, v)
+	}
+
+	fromAddress := wallet.account.Address()
+	nonce, err := wallet.client.PendingNonceAt(context.Background(), fromAddress)
+	if err != nil {
+		log.Fatal(err)
+	}
+	gasPrice, err := wallet.client.SuggestGasPrice(context.Background())
+	if err != nil {
+		log.Fatal(err)
+	}
+	auth := bind.NewKeyedTransactor(wallet.account.key.PrivateKey)
+
+	auth.Nonce = big.NewInt(int64(nonce))
+	auth.Value = big.NewInt(0)          // in wei
+	auth.GasLimit = big.NewInt(4000000) // in units
+	auth.GasPrice = gasPrice
+
+	var tx *types.Transaction
+
+	tx, err = wallet.ppsct.Execute(auth, vSlice, rSlice, sSlice, shash, rScript.TxnID, destinations, amounts)
+
+	fmt.Println(tx)
+	fmt.Println(err)
+
+	return buf.Bytes(), nil
 }
 
 // AddWatchedAddress - Add a script to the wallet and get notifications back when coins are received or spent from it
