@@ -137,14 +137,21 @@ func (wallet *EthereumWallet) IsDust(amount int64) bool {
 
 // MasterPrivateKey - Get the master private key
 func (wallet *EthereumWallet) MasterPrivateKey() *hd.ExtendedKey {
-	return hd.NewExtendedKey([]byte{0x00, 0x00, 0x00, 0x00}, wallet.account.key.Address.Bytes(),
+	return hd.NewExtendedKey([]byte{0x00, 0x00, 0x00, 0x00}, wallet.account.key.PrivateKey.D.Bytes(),
 		wallet.account.key.Address.Bytes(), wallet.account.key.Address.Bytes(), 0, 0, true)
 }
 
 // MasterPublicKey - Get the master public key
 func (wallet *EthereumWallet) MasterPublicKey() *hd.ExtendedKey {
-	return hd.NewExtendedKey([]byte{0x00, 0x00, 0x00, 0x00}, wallet.account.key.Address.Bytes(),
-		wallet.account.key.Address.Bytes(), wallet.account.key.Address.Bytes(), 0, 0, true)
+	publicKey := wallet.account.key.PrivateKey.Public()
+	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
+	if !ok {
+		log.Fatal("error casting public key to ECDSA")
+	}
+
+	publicKeyBytes := crypto.FromECDSAPub(publicKeyECDSA)
+	return hd.NewExtendedKey([]byte{0x00, 0x00, 0x00, 0x00}, publicKeyBytes,
+		wallet.account.key.Address.Bytes(), wallet.account.key.Address.Bytes(), 0, 0, false)
 }
 
 // CurrentAddress - Get the current address for the given purpose
