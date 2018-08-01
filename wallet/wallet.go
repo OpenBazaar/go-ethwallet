@@ -154,6 +154,15 @@ func (wallet *EthereumWallet) MasterPublicKey() *hd.ExtendedKey {
 		wallet.account.key.Address.Bytes(), wallet.account.key.Address.Bytes(), 0, 0, false)
 }
 
+// ChildKey Generate a child key using the given chaincode. The key is used in multisig transactions.
+// For most implementations this should just be child key 0.
+func (wallet *EthereumWallet) ChildKey(keyBytes []byte, chaincode []byte, isPrivateKey bool) (*hd.ExtendedKey, error) {
+	if isPrivateKey {
+		return wallet.MasterPrivateKey(), nil
+	}
+	return wallet.MasterPublicKey(), nil
+}
+
 // CurrentAddress - Get the current address for the given purpose
 func (wallet *EthereumWallet) CurrentAddress(purpose wi.KeyPurpose) EthAddress {
 	return *wallet.address
