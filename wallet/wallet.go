@@ -32,17 +32,22 @@ import (
 
 // EthConfiguration - used for eth specific configuration
 type EthConfiguration struct {
-	RopstenPPAddress string `yaml:"ROPSTEN_PPv2_ADDRESS"`
+	RopstenPPAddress       string `yaml:"ROPSTEN_PPv2_ADDRESS"`
+	RopstenRegistryAddress string `yaml:"ROPSTEN_REGISTRY"`
 }
 
 // EthRedeemScript - used to represent redeem script for eth wallet
+// <uniqueId: 20><threshold:1><timeoutHours:4><buyer:20><seller:20>
+// <moderator:20><multisigAddress:20><tokenAddress:20>
 type EthRedeemScript struct {
-	TxnID     common.Address
-	Threshold uint8
-	Timeout   uint32
-	Buyer     common.Address
-	Seller    common.Address
-	Moderator common.Address
+	TxnID           common.Address
+	Threshold       uint8
+	Timeout         uint32
+	Buyer           common.Address
+	Seller          common.Address
+	Moderator       common.Address
+	MultisigAddress common.Address
+	TokenAddress    common.Address
 }
 
 // SerializeEthScript - used to serialize eth redeem script
@@ -64,11 +69,12 @@ func DeserializeEthScript(b []byte) (EthRedeemScript, error) {
 
 // EthereumWallet is the wallet implementation for ethereum
 type EthereumWallet struct {
-	client  *EthClient
-	account *Account
-	address *EthAddress
-	service *Service
-	ppsct   *Wallet
+	client   *EthClient
+	account  *Account
+	address  *EthAddress
+	service  *Service
+	registry *Walletcm
+	ppsct    *Wallet
 }
 
 // NewEthereumWallet will return a reference to the Eth Wallet
@@ -96,12 +102,19 @@ func NewEthereumWallet(url, keyFile, passwd string) *EthereumWallet {
 		log.Fatalf("ethereum config not valid: %s", err.Error())
 	}
 
-	smtct, err := NewWallet(common.HexToAddress(ethConfig.RopstenPPAddress), client)
+	reg, err := NewWalletcm(common.HexToAddress(ethConfig.RopstenRegistryAddress), client)
 	if err != nil {
 		log.Fatalf("error initilaizing contract failed: %s", err.Error())
 	}
 
-	return &EthereumWallet{client, myAccount, &EthAddress{&addr}, &Service{}, smtct}
+	//reg.GetVersionDetails()
+
+	//smtct, err := NewWallet(common.HexToAddress(ethConfig.RopstenPPAddress), client)
+	//if err != nil {
+	//	log.Fatalf("error initilaizing contract failed: %s", err.Error())
+	//}
+
+	return &EthereumWallet{client, myAccount, &EthAddress{&addr}, &Service{}, reg, nil}
 }
 
 // GetBalance returns the balance for the wallet
@@ -299,6 +312,33 @@ func (wallet *EthereumWallet) GenerateMultisigScript(keys []hd.ExtendedKey, thre
 			"keys available", threshold, len(keys))
 	}
 
+	// call registry to get the deployed address for the escrow ct
+	fromAddress := wallet.account.Address()
+	nonce, err := wallet.client.PendingNonceAt(context.Background(), fromAddress)
+	if err != nil {
+		log.Fatal(err)
+	}
+	gasPrice, err := wallet.client.SuggestGasPrice(context.Background())
+	if err != nil {
+		log.Fatal(err)
+	}
+	auth := bind.NewKeyedTransactor(wallet.account.key.PrivateKey)
+
+	auth.Nonce = big.NewInt(int64(nonce))
+	auth.Value = big.NewInt(0)          // in wei
+	auth.GasLimit = big.NewInt(4000000) // in units
+	auth.GasPrice = gasPrice
+
+	ver, err := wallet.registry.GetVersionDetails(nil, "escrow", "1.0")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	smtct, err := NewWallet(ver.Implementation, wallet.client)
+	if err != nil {
+		log.Fatalf("error initilaizing contract failed: %s", err.Error())
+	}
+
 	var ecKeys []common.Address
 	for _, key := range keys {
 		ecKey, err := key.ECPubKey()
@@ -315,6 +355,7 @@ func (wallet *EthereumWallet) GenerateMultisigScript(keys []hd.ExtendedKey, thre
 	builder.Threshold = uint8(threshold)
 	builder.Buyer = ecKeys[0]
 	builder.Seller = ecKeys[1]
+	builder.MultisigAddress = ver.Implementation
 
 	if threshold > 1 {
 		builder.Moderator = ecKeys[2]
@@ -346,30 +387,14 @@ func (wallet *EthereumWallet) GenerateMultisigScript(keys []hd.ExtendedKey, thre
 	var shash [32]byte
 	copy(shash[:], hash.Sum(nil)[:])
 
-	fromAddress := wallet.account.Address()
-	nonce, err := wallet.client.PendingNonceAt(context.Background(), fromAddress)
-	if err != nil {
-		log.Fatal(err)
-	}
-	gasPrice, err := wallet.client.SuggestGasPrice(context.Background())
-	if err != nil {
-		log.Fatal(err)
-	}
-	auth := bind.NewKeyedTransactor(wallet.account.key.PrivateKey)
-
-	auth.Nonce = big.NewInt(int64(nonce))
-	auth.Value = big.NewInt(0)          // in wei
-	auth.GasLimit = big.NewInt(4000000) // in units
-	auth.GasPrice = gasPrice
-
 	var tx *types.Transaction
 
 	if builder.Threshold == 1 {
-		tx, err = wallet.ppsct.AddTransaction(auth, builder.Buyer, builder.Seller,
+		tx, err = smtct.AddTransaction(auth, builder.Buyer, builder.Seller,
 			[]common.Address{}, builder.Threshold,
 			builder.Timeout, shash)
 	} else {
-		tx, err = wallet.ppsct.AddTransaction(auth, builder.Buyer, builder.Seller,
+		tx, err = smtct.AddTransaction(auth, builder.Buyer, builder.Seller,
 			[]common.Address{builder.Moderator}, builder.Threshold,
 			builder.Timeout, shash)
 	}
@@ -447,6 +472,11 @@ func (wallet *EthereumWallet) Multisign(ins []wi.TransactionInput, outs []wi.Tra
 		return nil, err
 	}
 
+	smtct, err := NewWallet(rScript.MultisigAddress, wallet.client)
+	if err != nil {
+		log.Fatalf("error initilaizing contract failed: %s", err.Error())
+	}
+
 	destinations := []common.Address{}
 	amounts := []*big.Int{}
 
@@ -473,7 +503,7 @@ func (wallet *EthereumWallet) Multisign(ins []wi.TransactionInput, outs []wi.Tra
 
 	var tx *types.Transaction
 
-	tx, err = wallet.ppsct.Execute(auth, vSlice, rSlice, sSlice, shash, rScript.TxnID, destinations, amounts)
+	tx, err = smtct.Execute(auth, vSlice, rSlice, sSlice, shash, rScript.TxnID, destinations, amounts)
 
 	fmt.Println(tx)
 	fmt.Println(err)
