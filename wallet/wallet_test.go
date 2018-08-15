@@ -12,10 +12,13 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/rs/xid"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/OpenBazaar/go-ethwallet/util"
 )
 
 var validRopstenURL = fmt.Sprintf("https://ropsten.infura.io/%s", validInfuraKey)
@@ -182,8 +185,21 @@ func TestWalletNewAddress(t *testing.T) {
 
 func TestWalletContractAddTransaction(t *testing.T) {
 	setupRopstenWallet()
+
+	ver, err := validRopstenWallet.registry.GetRecommendedVersion(nil, "escrow")
+	if err != nil {
+		t.Error("error fetching escrow from registry")
+	}
+
+	if util.IsZeroAddress(ver.Implementation) {
+		log.Infof("escrow not available")
+		return
+	}
+
 	d, _ := time.ParseDuration("1h")
 	setupEthRedeemScript(d, 1)
+
+	script.MultisigAddress = ver.Implementation
 
 	redeemScript, err := SerializeEthScript(script)
 	if err != nil {
@@ -232,18 +248,22 @@ func TestWalletContractAddTransaction(t *testing.T) {
 	fmt.Println("timeout : ", script.Timeout)
 	fmt.Println("scrptHash : ", shash)
 
-	/*
-		var tx *types.Transaction
+	smtct, err := NewWallet(ver.Implementation, validRopstenWallet.client)
+	if err != nil {
+		t.Errorf("error initilaizing contract failed: %s", err.Error())
+	}
 
-		if script.Threshold == 1 {
-			tx, err = validRopstenWallet.ppsct.AddTransaction(auth, script.Buyer, script.Seller,
-				[]common.Address{}, script.Threshold, script.Timeout, shash)
-		} else {
-			tx, err = validRopstenWallet.ppsct.AddTransaction(auth, script.Buyer, script.Seller,
-				[]common.Address{script.Moderator}, script.Threshold, script.Timeout, shash)
-		}
+	var tx *types.Transaction
 
-		fmt.Println(tx)
-		fmt.Println(err)
-	*/
+	if script.Threshold == 1 {
+		tx, err = smtct.AddTransaction(auth, script.Buyer, script.Seller,
+			[]common.Address{}, script.Threshold, script.Timeout, shash)
+	} else {
+		tx, err = smtct.AddTransaction(auth, script.Buyer, script.Seller,
+			[]common.Address{script.Moderator}, script.Threshold, script.Timeout, shash)
+	}
+
+	fmt.Println(tx)
+	fmt.Println(err)
+
 }

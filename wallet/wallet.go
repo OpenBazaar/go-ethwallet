@@ -297,7 +297,7 @@ func (wallet *EthereumWallet) SweepAddress(utxos []wi.Utxo, address *wi.WalletAd
 // GenerateMultisigScript - Generate a multisig script from public keys. If a timeout is included the returned script should be a timelocked escrow which releases using the timeoutKey.
 func (wallet *EthereumWallet) GenerateMultisigScript(keys []hd.ExtendedKey, threshold int, timeout time.Duration, timeoutKey *hd.ExtendedKey) (wi.WalletAddress, []byte, error) {
 	if uint32(timeout.Hours()) > 0 && timeoutKey == nil {
-		return nil, nil, errors.New("Timeout key must be non nil when using an escrow timeout")
+		return nil, nil, errors.New("timeout key must be non nil when using an escrow timeout")
 	}
 
 	if len(keys) < threshold {
@@ -329,9 +329,13 @@ func (wallet *EthereumWallet) GenerateMultisigScript(keys []hd.ExtendedKey, thre
 	auth.GasLimit = big.NewInt(4000000) // in units
 	auth.GasPrice = gasPrice
 
-	ver, err := wallet.registry.GetVersionDetails(nil, "escrow", "1.0")
+	ver, err := wallet.registry.GetRecommendedVersion(nil, "escrow")
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	if util.IsZeroAddress(ver.Implementation) {
+		return nil, nil, errors.New("no escrow contract available")
 	}
 
 	smtct, err := NewWallet(ver.Implementation, wallet.client)
