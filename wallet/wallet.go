@@ -13,6 +13,9 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/btcsuite/btcutil"
+
+	"github.com/OpenBazaar/multiwallet/config"
 	wi "github.com/OpenBazaar/wallet-interface"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	hd "github.com/btcsuite/btcutil/hdkeychain"
@@ -25,6 +28,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/rs/xid"
 	log "github.com/sirupsen/logrus"
+	"github.com/tyler-smith/go-bip39"
 	"gopkg.in/yaml.v2"
 
 	"github.com/OpenBazaar/go-ethwallet/util"
@@ -77,8 +81,8 @@ type EthereumWallet struct {
 	ppsct    *Wallet
 }
 
-// NewEthereumWallet will return a reference to the Eth Wallet
-func NewEthereumWallet(url, keyFile, passwd string) *EthereumWallet {
+// NewEthereumWalletWithKeyfile will return a reference to the Eth Wallet
+func NewEthereumWalletWithKeyfile(url, keyFile, passwd string) *EthereumWallet {
 	client, err := NewEthClient(url)
 	if err != nil {
 		log.Fatalf("error initializing wallet: %v", err)
@@ -88,6 +92,55 @@ func NewEthereumWallet(url, keyFile, passwd string) *EthereumWallet {
 	if err != nil {
 		log.Fatalf("key file validation failed: %s", err.Error())
 	}
+	addr := myAccount.Address()
+
+	_, filename, _, _ := runtime.Caller(0)
+	conf, err := ioutil.ReadFile(path.Join(path.Dir(filename), "../configuration.yaml"))
+
+	if err != nil {
+		log.Fatalf("ethereum config not found: %s", err.Error())
+	}
+	ethConfig := EthConfiguration{}
+	err = yaml.Unmarshal(conf, &ethConfig)
+	if err != nil {
+		log.Fatalf("ethereum config not valid: %s", err.Error())
+	}
+
+	reg, err := NewWalletcm(common.HexToAddress(ethConfig.RopstenRegistryAddress), client)
+	if err != nil {
+		log.Fatalf("error initilaizing contract failed: %s", err.Error())
+	}
+
+	//reg.GetVersionDetails()
+
+	//smtct, err := NewWallet(common.HexToAddress(ethConfig.RopstenPPAddress), client)
+	//if err != nil {
+	//	log.Fatalf("error initilaizing contract failed: %s", err.Error())
+	//}
+
+	return &EthereumWallet{client, myAccount, &EthAddress{&addr}, &Service{}, reg, nil}
+}
+
+// NewEthereumWallet will return a reference to the Eth Wallet
+func NewEthereumWallet(cfg config.CoinConfig, mnemonic string) *EthereumWallet {
+	client, err := NewEthClient(cfg.ClientAPI.String())
+	if err != nil {
+		log.Fatalf("error initializing wallet: %v", err)
+	}
+	var myAccount *Account
+	seed := bip39.NewSeed(mnemonic, "")
+
+	privateKeyECDSA, err := crypto.ToECDSA(seed)
+	if err != nil {
+		return nil
+	}
+
+	key := &keystore.Key{
+		Address:    crypto.PubkeyToAddress(privateKeyECDSA.PublicKey),
+		PrivateKey: privateKeyECDSA,
+	}
+
+	myAccount = &Account{key}
 	addr := myAccount.Address()
 
 	_, filename, _, _ := runtime.Caller(0)
@@ -255,7 +308,7 @@ func (wallet *EthereumWallet) GetFeePerByte(feeLevel wi.FeeLevel) uint64 {
 }
 
 // Spend - Send ether to an external wallet
-func (wallet *EthereumWallet) Spend(amount int64, addr wi.WalletAddress, feeLevel wi.FeeLevel) (*chainhash.Hash, error) {
+func (wallet *EthereumWallet) Spend(amount int64, addr btcutil.Address, feeLevel wi.FeeLevel) (*chainhash.Hash, error) {
 	hash, err := wallet.Transfer(addr.String(), big.NewInt(amount))
 	var h *chainhash.Hash
 	if err == nil {
@@ -290,12 +343,12 @@ func (wallet *EthereumWallet) EstimateSpendFee(amount int64, feeLevel wi.FeeLeve
 }
 
 // SweepAddress - Build and broadcast a transaction that sweeps all coins from an address. If it is a p2sh multisig, the redeemScript must be included
-func (wallet *EthereumWallet) SweepAddress(utxos []wi.Utxo, address *wi.WalletAddress, key *hd.ExtendedKey, redeemScript *[]byte, feeLevel wi.FeeLevel) (*chainhash.Hash, error) {
+func (wallet *EthereumWallet) SweepAddress(utxos []wi.Utxo, address *btcutil.Address, key *hd.ExtendedKey, redeemScript *[]byte, feeLevel wi.FeeLevel) (*chainhash.Hash, error) {
 	return chainhash.NewHashFromStr("")
 }
 
 // GenerateMultisigScript - Generate a multisig script from public keys. If a timeout is included the returned script should be a timelocked escrow which releases using the timeoutKey.
-func (wallet *EthereumWallet) GenerateMultisigScript(keys []hd.ExtendedKey, threshold int, timeout time.Duration, timeoutKey *hd.ExtendedKey) (wi.WalletAddress, []byte, error) {
+func (wallet *EthereumWallet) GenerateMultisigScript(keys []hd.ExtendedKey, threshold int, timeout time.Duration, timeoutKey *hd.ExtendedKey) (btcutil.Address, []byte, error) {
 	if uint32(timeout.Hours()) > 0 && timeoutKey == nil {
 		return nil, nil, errors.New("timeout key must be non nil when using an escrow timeout")
 	}
@@ -325,8 +378,8 @@ func (wallet *EthereumWallet) GenerateMultisigScript(keys []hd.ExtendedKey, thre
 	auth := bind.NewKeyedTransactor(wallet.account.key.PrivateKey)
 
 	auth.Nonce = big.NewInt(int64(nonce))
-	auth.Value = big.NewInt(0)          // in wei
-	auth.GasLimit = big.NewInt(4000000) // in units
+	auth.Value = big.NewInt(0) // in wei
+	auth.GasLimit = 4000000    // in units
 	auth.GasPrice = gasPrice
 
 	ver, err := wallet.registry.GetRecommendedVersion(nil, "escrow")
@@ -354,7 +407,7 @@ func (wallet *EthereumWallet) GenerateMultisigScript(keys []hd.ExtendedKey, thre
 
 	builder := EthRedeemScript{}
 
-	builder.TxnID = common.StringToAddress(xid.New().String() + xid.New().String())
+	builder.TxnID = common.HexToAddress(xid.New().String() + xid.New().String())
 	builder.Timeout = uint32(timeout.Hours())
 	builder.Threshold = uint8(threshold)
 	builder.Buyer = ecKeys[0]
@@ -386,7 +439,7 @@ func (wallet *EthereumWallet) GenerateMultisigScript(keys []hd.ExtendedKey, thre
 
 	hash := sha3.NewKeccak256()
 	hash.Write(redeemScript)
-	addr := common.StringToAddress(hexutil.Encode(hash.Sum(nil)[:]))
+	addr := common.HexToAddress(hexutil.Encode(hash.Sum(nil)[:]))
 	retAddr := EthAddress{&addr}
 	var shash [32]byte
 	copy(shash[:], hash.Sum(nil)[:])
@@ -501,8 +554,8 @@ func (wallet *EthereumWallet) Multisign(ins []wi.TransactionInput, outs []wi.Tra
 	auth := bind.NewKeyedTransactor(wallet.account.key.PrivateKey)
 
 	auth.Nonce = big.NewInt(int64(nonce))
-	auth.Value = big.NewInt(0)          // in wei
-	auth.GasLimit = big.NewInt(4000000) // in units
+	auth.Value = big.NewInt(0) // in wei
+	auth.GasLimit = 4000000    // in units
 	auth.GasPrice = gasPrice
 
 	var tx *types.Transaction
@@ -516,7 +569,7 @@ func (wallet *EthereumWallet) Multisign(ins []wi.TransactionInput, outs []wi.Tra
 }
 
 // AddWatchedAddress - Add a script to the wallet and get notifications back when coins are received or spent from it
-func (wallet *EthereumWallet) AddWatchedAddress(address wi.WalletAddress) error {
+func (wallet *EthereumWallet) AddWatchedAddress(address btcutil.Address) error {
 	return nil
 }
 

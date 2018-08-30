@@ -115,7 +115,7 @@ func (client *EthClient) EstimateTxnGas(from, to common.Address, value *big.Int)
 	if err != nil {
 		return gas, err
 	}
-	return gas.Mul(gasLimit, gasPrice), nil
+	return gas.Mul(big.NewInt(int64(gasLimit)), gasPrice), nil
 }
 
 // EstimateGasSpend - returns estimated gas
@@ -130,7 +130,7 @@ func (client *EthClient) EstimateGasSpend(from common.Address, value *big.Int) (
 	if err != nil {
 		return gas, err
 	}
-	return gas.Mul(gasLimit, gasPrice), nil
+	return gas.Mul(big.NewInt(int64(gasLimit)), gasPrice), nil
 }
 
 /*

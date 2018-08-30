@@ -29,17 +29,17 @@ var destWallet *EthereumWallet
 var script EthRedeemScript
 
 func setupRopstenWallet() {
-	validRopstenWallet = NewEthereumWallet(validRopstenURL, validKeyFile, validPassword)
+	validRopstenWallet = NewEthereumWalletWithKeyfile(validRopstenURL, validKeyFile, validPassword)
 }
 
 func setupDestWallet() {
-	destWallet = NewEthereumWallet(validRopstenURL,
+	destWallet = NewEthereumWalletWithKeyfile(validRopstenURL,
 		"../test/UTC--2018-06-16T20-09-33.726552102Z--cecb952de5b23950b15bfd49302d1bdd25f9ee67", validPassword)
 }
 
 func setupEthRedeemScript(timeout time.Duration, threshold int) {
 
-	script.TxnID = common.StringToAddress(xid.New().String() + xid.New().String())
+	script.TxnID = common.HexToAddress(xid.New().String() + xid.New().String())
 	script.Timeout = uint32(timeout.Hours())
 	script.Threshold = uint8(threshold)
 	script.Buyer = common.HexToAddress(validSourceAddress)
@@ -47,7 +47,7 @@ func setupEthRedeemScript(timeout time.Duration, threshold int) {
 }
 
 func TestNewWalletWithValidValues(t *testing.T) {
-	wallet := NewEthereumWallet(validRopstenURL, validKeyFile, validPassword)
+	wallet := NewEthereumWalletWithKeyfile(validRopstenURL, validKeyFile, validPassword)
 	if wallet == nil {
 		t.Errorf("valid credentials should return a wallet")
 	}
@@ -58,7 +58,7 @@ func TestNewWalletWithValidValues(t *testing.T) {
 
 func TestNewWalletWithInValidValues(t *testing.T) {
 	t.SkipNow()
-	wallet := NewEthereumWallet(validRopstenURL, validKeyFile, invalidPassword)
+	wallet := NewEthereumWalletWithKeyfile(validRopstenURL, validKeyFile, invalidPassword)
 	if wallet != nil {
 		t.Errorf("invalid credentials should return a wallet")
 	}
@@ -237,8 +237,8 @@ func TestWalletContractAddTransaction(t *testing.T) {
 	auth := bind.NewKeyedTransactor(validRopstenWallet.account.key.PrivateKey)
 
 	auth.Nonce = big.NewInt(int64(nonce))
-	auth.Value = big.NewInt(66778899)   // in wei
-	auth.GasLimit = big.NewInt(4000000) // in units
+	auth.Value = big.NewInt(66778899) // in wei
+	auth.GasLimit = 4000000           // in units
 	auth.GasPrice = gasPrice
 
 	fmt.Println("buyer : ", script.Buyer)

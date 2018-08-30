@@ -45,7 +45,7 @@ func init() {
 	ropstenURL = fmt.Sprintf("https://ropsten.infura.io/%s", validInfuraKey)
 
 	validRopstenTxn = *types.NewTransaction(0, common.HexToAddress(validDestinationAddress),
-		big.NewInt(3344556677), big.NewInt(53000), big.NewInt(1000000000),
+		big.NewInt(3344556677), 53000, big.NewInt(1000000000),
 		[]byte("f86780843b9aca0082cf0894cecb952de5b23950b15bfd49302d1bdd25f9ee6784c759e285801ca056dfa0ed4e028d2f2307c421bbe0ebe7516e5fdd140ff080091cb03137a885f8a03197486094c53edb2aaefb6ba5059dd6c82fc709134c93c0c422cb671a139352"))
 }
 
@@ -339,7 +339,7 @@ func TestValidGetTransaction(t *testing.T) {
 		t.Errorf("txn should have been correctly fetched")
 	}
 
-	if validRopstenTxn.Gas().Cmp(txn.Gas()) != 0 {
+	if validRopstenTxn.Gas() == txn.Gas() {
 		t.Errorf("txn should have been correctly fetched")
 	}
 

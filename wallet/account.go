@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"os"
 
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -28,6 +29,11 @@ func (addr EthAddress) EncodeAddress() string {
 // ScriptAddress returns byte representation of address
 func (addr EthAddress) ScriptAddress() []byte {
 	return addr.address.Bytes()
+}
+
+// IsForNet returns true because EthAddress has to become btc.Address
+func (addr EthAddress) IsForNet(params *chaincfg.Params) bool {
+	return true
 }
 
 // Account represents ethereum keystore

@@ -83,7 +83,7 @@ func main() {
 	fmt.Println(myAccount.Address().String())
 
 	// create the source wallet obj for Infura Ropsten
-	myWallet := wallet.NewEthereumWallet(ropstenURL, keyFile, password)
+	myWallet := wallet.NewEthereumWalletWithKeyfile(ropstenURL, keyFile, password)
 	fmt.Println(myWallet.GetBalance())
 
 	// create dest account
@@ -97,7 +97,7 @@ func main() {
 	fmt.Println(destAccount.Address().String())
 
 	// create the destination wallet obj for Infura Ropsten
-	destWallet := wallet.NewEthereumWallet(ropstenURL, destKeyFile, password)
+	destWallet := wallet.NewEthereumWalletWithKeyfile(ropstenURL, destKeyFile, password)
 	fmt.Println(destWallet.GetBalance())
 
 	// lets transfer
