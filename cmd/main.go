@@ -76,7 +76,7 @@ func main() {
 
 	//wallet.GenDefaultKeyStore(password)
 	var myAccount *wallet.Account
-	myAccount, err = wallet.NewAccount(keyFile, password)
+	myAccount, err = wallet.NewAccountFromKeyfile(keyFile, password)
 	if err != nil {
 		log.Fatal("key file validation failed:%s", err.Error())
 	}
@@ -90,7 +90,7 @@ func main() {
 	//wallet.GenDefaultKeyStore(password)
 	var destAccount *wallet.Account
 	destKeyFile := "./UTC--2018-06-16T20-09-33.726552102Z--cecb952de5b23950b15bfd49302d1bdd25f9ee67"
-	destAccount, err = wallet.NewAccount(destKeyFile, password)
+	destAccount, err = wallet.NewAccountFromKeyfile(destKeyFile, password)
 	if err != nil {
 		log.Fatal("key file validation failed:%s", err.Error())
 	}

@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	bip39 "github.com/tyler-smith/go-bip39"
 )
 
 // EthAddress implements the WalletAddress interface
@@ -41,8 +42,8 @@ type Account struct {
 	key *keystore.Key
 }
 
-// NewAccount returns the account imported
-func NewAccount(keyFile, password string) (*Account, error) {
+// NewAccountFromKeyfile returns the account imported
+func NewAccountFromKeyfile(keyFile, password string) (*Account, error) {
 	key, err := importKey(keyFile, password)
 	if err != nil {
 		return nil, err
@@ -51,6 +52,57 @@ func NewAccount(keyFile, password string) (*Account, error) {
 	return &Account{
 		key: key,
 	}, nil
+}
+
+// NewAccountFromMnemonic returns generated account
+func NewAccountFromMnemonic(mnemonic, password string) (*Account, error) {
+	seed := bip39.NewSeed(mnemonic, password)
+
+	/*
+		fmt.Println(len(seed))
+		fmt.Println(seed)
+
+		priv := new(ecdsa.PrivateKey)
+		priv.PublicKey.Curve = btcec.S256()
+
+		if 8*len(seed[:32]) != priv.Params().BitSize {
+			fmt.Println("whoa....", 8*len(seed[:32]), priv.Params().BitSize)
+			//return nil, fmt.Errorf("invalid length, need %d bits", priv.Params().BitSize)
+		}
+
+	*/
+
+	privateKeyECDSA, err := crypto.ToECDSA(seed[:32])
+	if err != nil {
+		return nil, err
+	}
+
+	/*
+		fmt.Println(privateKeyECDSA)
+		fmt.Println(privateKeyECDSA.Public())
+
+		privateKeyBytes := crypto.FromECDSA(privateKeyECDSA)
+		fmt.Println(hexutil.Encode(privateKeyBytes)[2:])
+
+		publicKey := privateKeyECDSA.Public()
+		publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
+		if !ok {
+			log.Fatal("error casting public key to ECDSA")
+		}
+
+		publicKeyBytes := crypto.FromECDSAPub(publicKeyECDSA)
+		fmt.Println(hexutil.Encode(publicKeyBytes)[4:])
+
+		address := crypto.PubkeyToAddress(*publicKeyECDSA).Hex()
+		fmt.Println("address : ", address)
+	*/
+
+	key := &keystore.Key{
+		Address:    crypto.PubkeyToAddress(privateKeyECDSA.PublicKey),
+		PrivateKey: privateKeyECDSA,
+	}
+
+	return &Account{key}, nil
 }
 
 func importKey(keyFile, password string) (*keystore.Key, error) {

@@ -14,7 +14,7 @@ import (
 )
 
 const invalidInfuraKey = "IAMNOTREAL"
-const validSourceAddress = "0xc0b4ef9e9d2806f643be94d2434e5c3d5cecd255"
+const validSourceAddress = "0xc0B4ef9E9d2806F643be94d2434e5C3d5cEcd255"
 const validDestinationAddress = "0xcecb952de5b23950b15bfd49302d1bdd25f9ee67"
 
 const validTxn1 = "0xae818b782ce2d5ef8160de1d022440fdaf92cf91d4cd444eb23c6b6a55240c5b"
@@ -339,7 +339,7 @@ func TestValidGetTransaction(t *testing.T) {
 		t.Errorf("txn should have been correctly fetched")
 	}
 
-	if validRopstenTxn.Gas() == txn.Gas() {
+	if validRopstenTxn.Gas() != txn.Gas() {
 		t.Errorf("txn should have been correctly fetched")
 	}
 
@@ -369,7 +369,7 @@ func TestTransfer(t *testing.T) {
 		t.Errorf("client should have initialized")
 	}
 	addr := common.HexToAddress(validSourceAddress)
-	account, err := NewAccount("../test/UTC--2018-06-16T18-41-19.615987160Z--c0b4ef9e9d2806f643be94d2434e5c3d5cecd255", "hotpotato")
+	account, err := NewAccountFromKeyfile("../test/UTC--2018-06-16T18-41-19.615987160Z--c0b4ef9e9d2806f643be94d2434e5c3d5cecd255", "hotpotato")
 	if err != nil {
 		t.Errorf("account should have initialized")
 	}

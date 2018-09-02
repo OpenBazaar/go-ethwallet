@@ -28,7 +28,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/rs/xid"
 	log "github.com/sirupsen/logrus"
-	"github.com/tyler-smith/go-bip39"
 	"gopkg.in/yaml.v2"
 
 	"github.com/OpenBazaar/go-ethwallet/util"
@@ -88,7 +87,7 @@ func NewEthereumWalletWithKeyfile(url, keyFile, passwd string) *EthereumWallet {
 		log.Fatalf("error initializing wallet: %v", err)
 	}
 	var myAccount *Account
-	myAccount, err = NewAccount(keyFile, passwd)
+	myAccount, err = NewAccountFromKeyfile(keyFile, passwd)
 	if err != nil {
 		log.Fatalf("key file validation failed: %s", err.Error())
 	}
@@ -128,19 +127,25 @@ func NewEthereumWallet(cfg config.CoinConfig, mnemonic string) *EthereumWallet {
 		log.Fatalf("error initializing wallet: %v", err)
 	}
 	var myAccount *Account
-	seed := bip39.NewSeed(mnemonic, "")
+	/*
+		seed := bip39.NewSeed(mnemonic, "")
 
-	privateKeyECDSA, err := crypto.ToECDSA(seed)
+		privateKeyECDSA, err := crypto.ToECDSA(seed)
+		if err != nil {
+			return nil
+		}
+
+		key := &keystore.Key{
+			Address:    crypto.PubkeyToAddress(privateKeyECDSA.PublicKey),
+			PrivateKey: privateKeyECDSA,
+		}
+
+		myAccount = &Account{key}
+	*/
+	myAccount, err = NewAccountFromMnemonic(mnemonic, "")
 	if err != nil {
-		return nil
+		log.Fatalf("mnemonic based pk generation failed: %s", err.Error())
 	}
-
-	key := &keystore.Key{
-		Address:    crypto.PubkeyToAddress(privateKeyECDSA.PublicKey),
-		PrivateKey: privateKeyECDSA,
-	}
-
-	myAccount = &Account{key}
 	addr := myAccount.Address()
 
 	_, filename, _, _ := runtime.Caller(0)
@@ -643,5 +648,5 @@ func GenDefaultKeyStore(passwd string) (*Account, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewAccount(account.URL.Path, passwd)
+	return NewAccountFromKeyfile(account.URL.Path, passwd)
 }
