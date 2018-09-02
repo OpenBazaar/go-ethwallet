@@ -17,6 +17,7 @@ import (
 
 	"github.com/OpenBazaar/multiwallet/config"
 	wi "github.com/OpenBazaar/wallet-interface"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	hd "github.com/btcsuite/btcutil/hdkeychain"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -121,10 +122,11 @@ func NewEthereumWalletWithKeyfile(url, keyFile, passwd string) *EthereumWallet {
 }
 
 // NewEthereumWallet will return a reference to the Eth Wallet
-func NewEthereumWallet(cfg config.CoinConfig, mnemonic string) *EthereumWallet {
+func NewEthereumWallet(cfg config.CoinConfig, mnemonic string) (*EthereumWallet, error) {
 	client, err := NewEthClient(cfg.ClientAPI.String())
 	if err != nil {
-		log.Fatalf("error initializing wallet: %v", err)
+		log.Errorf("error initializing wallet: %v", err)
+		return nil, err
 	}
 	var myAccount *Account
 	/*
@@ -144,7 +146,8 @@ func NewEthereumWallet(cfg config.CoinConfig, mnemonic string) *EthereumWallet {
 	*/
 	myAccount, err = NewAccountFromMnemonic(mnemonic, "")
 	if err != nil {
-		log.Fatalf("mnemonic based pk generation failed: %s", err.Error())
+		log.Errorf("mnemonic based pk generation failed: %s", err.Error())
+		return nil, err
 	}
 	addr := myAccount.Address()
 
@@ -152,17 +155,20 @@ func NewEthereumWallet(cfg config.CoinConfig, mnemonic string) *EthereumWallet {
 	conf, err := ioutil.ReadFile(path.Join(path.Dir(filename), "../configuration.yaml"))
 
 	if err != nil {
-		log.Fatalf("ethereum config not found: %s", err.Error())
+		log.Errorf("ethereum config not found: %s", err.Error())
+		return nil, err
 	}
 	ethConfig := EthConfiguration{}
 	err = yaml.Unmarshal(conf, &ethConfig)
 	if err != nil {
-		log.Fatalf("ethereum config not valid: %s", err.Error())
+		log.Errorf("ethereum config not valid: %s", err.Error())
+		return nil, err
 	}
 
 	reg, err := NewWalletcm(common.HexToAddress(ethConfig.RopstenRegistryAddress), client)
 	if err != nil {
-		log.Fatalf("error initilaizing contract failed: %s", err.Error())
+		log.Errorf("error initilaizing contract failed: %s", err.Error())
+		return nil, err
 	}
 
 	//reg.GetVersionDetails()
@@ -172,7 +178,12 @@ func NewEthereumWallet(cfg config.CoinConfig, mnemonic string) *EthereumWallet {
 	//	log.Fatalf("error initilaizing contract failed: %s", err.Error())
 	//}
 
-	return &EthereumWallet{client, myAccount, &EthAddress{&addr}, &Service{}, reg, nil}
+	return &EthereumWallet{client, myAccount, &EthAddress{&addr}, &Service{}, reg, nil}, nil
+}
+
+// Params - return nil to comply
+func (wallet *EthereumWallet) Params() *chaincfg.Params {
+	return nil
 }
 
 // GetBalance returns the balance for the wallet
@@ -235,17 +246,17 @@ func (wallet *EthereumWallet) ChildKey(keyBytes []byte, chaincode []byte, isPriv
 }
 
 // CurrentAddress - Get the current address for the given purpose
-func (wallet *EthereumWallet) CurrentAddress(purpose wi.KeyPurpose) EthAddress {
+func (wallet *EthereumWallet) CurrentAddress(purpose wi.KeyPurpose) btcutil.Address {
 	return *wallet.address
 }
 
 // NewAddress - Returns a fresh address that has never been returned by this function
-func (wallet *EthereumWallet) NewAddress(purpose wi.KeyPurpose) EthAddress {
+func (wallet *EthereumWallet) NewAddress(purpose wi.KeyPurpose) btcutil.Address {
 	return *wallet.address
 }
 
 // DecodeAddress - Parse the address string and return an address interface
-func (wallet *EthereumWallet) DecodeAddress(addr string) (EthAddress, error) {
+func (wallet *EthereumWallet) DecodeAddress(addr string) (btcutil.Address, error) {
 	ethAddr := common.HexToAddress(addr)
 	if wallet.HasKey(EthAddress{&ethAddr}) {
 		return *wallet.address, nil
@@ -253,12 +264,17 @@ func (wallet *EthereumWallet) DecodeAddress(addr string) (EthAddress, error) {
 	return EthAddress{}, errors.New("invalid or unknown address")
 }
 
+// ScriptToAddress - ?
+func (wallet *EthereumWallet) ScriptToAddress(script []byte) (btcutil.Address, error) {
+	return wallet.address, nil
+}
+
 // HasKey - Returns if the wallet has the key for the given address
-func (wallet *EthereumWallet) HasKey(addr EthAddress) bool {
-	if !util.IsValidAddress(addr.address.String()) {
+func (wallet *EthereumWallet) HasKey(addr btcutil.Address) bool {
+	if !util.IsValidAddress(addr.String()) {
 		return false
 	}
-	return wallet.account.Address().String() == addr.address.String()
+	return wallet.account.Address().String() == addr.String()
 }
 
 // Balance - Get the confirmed and unconfirmed balances
@@ -348,7 +364,7 @@ func (wallet *EthereumWallet) EstimateSpendFee(amount int64, feeLevel wi.FeeLeve
 }
 
 // SweepAddress - Build and broadcast a transaction that sweeps all coins from an address. If it is a p2sh multisig, the redeemScript must be included
-func (wallet *EthereumWallet) SweepAddress(utxos []wi.Utxo, address *btcutil.Address, key *hd.ExtendedKey, redeemScript *[]byte, feeLevel wi.FeeLevel) (*chainhash.Hash, error) {
+func (wallet *EthereumWallet) SweepAddress(utxos []wi.TransactionInput, address *btcutil.Address, key *hd.ExtendedKey, redeemScript *[]byte, feeLevel wi.FeeLevel) (*chainhash.Hash, error) {
 	return chainhash.NewHashFromStr("")
 }
 
