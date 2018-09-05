@@ -1,5 +1,5 @@
-// This file is an automatically generated Go binding. Do not modify as any
-// change will likely be lost upon the next re-generation!
+// Code generated - DO NOT EDIT.
+// This file is a generated binding and any manual changes will be lost.
 
 package wallet
 
@@ -7,10 +7,12 @@ import (
 	"math/big"
 	"strings"
 
+	ethereum "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/event"
 )
 
 // WalletABI is the input ABI used to generate the binding from.
@@ -34,13 +36,14 @@ func DeployWallet(auth *bind.TransactOpts, backend bind.ContractBackend) (common
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
-	return address, tx, &Wallet{WalletCaller: WalletCaller{contract: contract}, WalletTransactor: WalletTransactor{contract: contract}}, nil
+	return address, tx, &Wallet{WalletCaller: WalletCaller{contract: contract}, WalletTransactor: WalletTransactor{contract: contract}, WalletFilterer: WalletFilterer{contract: contract}}, nil
 }
 
 // Wallet is an auto generated Go binding around an Ethereum contract.
 type Wallet struct {
 	WalletCaller     // Read-only binding to the contract
 	WalletTransactor // Write-only binding to the contract
+	WalletFilterer   // Log filterer for contract events
 }
 
 // WalletCaller is an auto generated read-only Go binding around an Ethereum contract.
@@ -50,6 +53,11 @@ type WalletCaller struct {
 
 // WalletTransactor is an auto generated write-only Go binding around an Ethereum contract.
 type WalletTransactor struct {
+	contract *bind.BoundContract // Generic contract wrapper for the low level calls
+}
+
+// WalletFilterer is an auto generated log filtering Go binding around an Ethereum contract events.
+type WalletFilterer struct {
 	contract *bind.BoundContract // Generic contract wrapper for the low level calls
 }
 
@@ -92,16 +100,16 @@ type WalletTransactorRaw struct {
 
 // NewWallet creates a new instance of Wallet, bound to a specific deployed contract.
 func NewWallet(address common.Address, backend bind.ContractBackend) (*Wallet, error) {
-	contract, err := bindWallet(address, backend, backend)
+	contract, err := bindWallet(address, backend, backend, backend)
 	if err != nil {
 		return nil, err
 	}
-	return &Wallet{WalletCaller: WalletCaller{contract: contract}, WalletTransactor: WalletTransactor{contract: contract}}, nil
+	return &Wallet{WalletCaller: WalletCaller{contract: contract}, WalletTransactor: WalletTransactor{contract: contract}, WalletFilterer: WalletFilterer{contract: contract}}, nil
 }
 
 // NewWalletCaller creates a new read-only instance of Wallet, bound to a specific deployed contract.
 func NewWalletCaller(address common.Address, caller bind.ContractCaller) (*WalletCaller, error) {
-	contract, err := bindWallet(address, caller, nil)
+	contract, err := bindWallet(address, caller, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -110,20 +118,29 @@ func NewWalletCaller(address common.Address, caller bind.ContractCaller) (*Walle
 
 // NewWalletTransactor creates a new write-only instance of Wallet, bound to a specific deployed contract.
 func NewWalletTransactor(address common.Address, transactor bind.ContractTransactor) (*WalletTransactor, error) {
-	contract, err := bindWallet(address, nil, transactor)
+	contract, err := bindWallet(address, nil, transactor, nil)
 	if err != nil {
 		return nil, err
 	}
 	return &WalletTransactor{contract: contract}, nil
 }
 
+// NewWalletFilterer creates a new log filterer instance of Wallet, bound to a specific deployed contract.
+func NewWalletFilterer(address common.Address, filterer bind.ContractFilterer) (*WalletFilterer, error) {
+	contract, err := bindWallet(address, nil, nil, filterer)
+	if err != nil {
+		return nil, err
+	}
+	return &WalletFilterer{contract: contract}, nil
+}
+
 // bindWallet binds a generic wrapper to an already deployed contract.
-func bindWallet(address common.Address, caller bind.ContractCaller, transactor bind.ContractTransactor) (*bind.BoundContract, error) {
+func bindWallet(address common.Address, caller bind.ContractCaller, transactor bind.ContractTransactor, filterer bind.ContractFilterer) (*bind.BoundContract, error) {
 	parsed, err := abi.JSON(strings.NewReader(WalletABI))
 	if err != nil {
 		return nil, err
 	}
-	return bind.NewBoundContract(address, parsed, caller, transactor, nil), nil
+	return bind.NewBoundContract(address, parsed, caller, transactor, filterer), nil
 }
 
 // Call invokes the (constant) contract method with params as input values and
@@ -413,4 +430,396 @@ func (_Wallet *WalletSession) Execute(sigV []uint8, sigR [][32]byte, sigS [][32]
 // Solidity: function execute(sigV uint8[], sigR bytes32[], sigS bytes32[], scriptHash bytes32, uniqueId bytes20, destinations address[], amounts uint256[]) returns()
 func (_Wallet *WalletTransactorSession) Execute(sigV []uint8, sigR [][32]byte, sigS [][32]byte, scriptHash [32]byte, uniqueId [20]byte, destinations []common.Address, amounts []*big.Int) (*types.Transaction, error) {
 	return _Wallet.Contract.Execute(&_Wallet.TransactOpts, sigV, sigR, sigS, scriptHash, uniqueId, destinations, amounts)
+}
+
+// WalletExecutedIterator is returned from FilterExecuted and is used to iterate over the raw logs and unpacked data for Executed events raised by the Wallet contract.
+type WalletExecutedIterator struct {
+	Event *WalletExecuted // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *WalletExecutedIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(WalletExecuted)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(WalletExecuted)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *WalletExecutedIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *WalletExecutedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// WalletExecuted represents a Executed event raised by the Wallet contract.
+type WalletExecuted struct {
+	ScriptHash   [32]byte
+	Destinations []common.Address
+	Amounts      []*big.Int
+	Raw          types.Log // Blockchain specific contextual infos
+}
+
+// FilterExecuted is a free log retrieval operation binding the contract event 0x688e2a1b34445bcd47b0e11ba2a9c8c4d850a1831b64199b59d1c70e29701545.
+//
+// Solidity: e Executed(scriptHash bytes32, destinations address[], amounts uint256[])
+func (_Wallet *WalletFilterer) FilterExecuted(opts *bind.FilterOpts) (*WalletExecutedIterator, error) {
+
+	logs, sub, err := _Wallet.contract.FilterLogs(opts, "Executed")
+	if err != nil {
+		return nil, err
+	}
+	return &WalletExecutedIterator{contract: _Wallet.contract, event: "Executed", logs: logs, sub: sub}, nil
+}
+
+// WatchExecuted is a free log subscription operation binding the contract event 0x688e2a1b34445bcd47b0e11ba2a9c8c4d850a1831b64199b59d1c70e29701545.
+//
+// Solidity: e Executed(scriptHash bytes32, destinations address[], amounts uint256[])
+func (_Wallet *WalletFilterer) WatchExecuted(opts *bind.WatchOpts, sink chan<- *WalletExecuted) (event.Subscription, error) {
+
+	logs, sub, err := _Wallet.contract.WatchLogs(opts, "Executed")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(WalletExecuted)
+				if err := _Wallet.contract.UnpackLog(event, "Executed", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// WalletFundAddedIterator is returned from FilterFundAdded and is used to iterate over the raw logs and unpacked data for FundAdded events raised by the Wallet contract.
+type WalletFundAddedIterator struct {
+	Event *WalletFundAdded // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *WalletFundAddedIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(WalletFundAdded)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(WalletFundAdded)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *WalletFundAddedIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *WalletFundAddedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// WalletFundAdded represents a FundAdded event raised by the Wallet contract.
+type WalletFundAdded struct {
+	ScriptHash [32]byte
+	From       common.Address
+	ValueAdded *big.Int
+	Raw        types.Log // Blockchain specific contextual infos
+}
+
+// FilterFundAdded is a free log retrieval operation binding the contract event 0xf66fd2ae9e24a6a24b02e1b5b7512ffde5149a4176085fc0298ae228c9b9d729.
+//
+// Solidity: e FundAdded(scriptHash bytes32, from indexed address, valueAdded uint256)
+func (_Wallet *WalletFilterer) FilterFundAdded(opts *bind.FilterOpts, from []common.Address) (*WalletFundAddedIterator, error) {
+
+	var fromRule []interface{}
+	for _, fromItem := range from {
+		fromRule = append(fromRule, fromItem)
+	}
+
+	logs, sub, err := _Wallet.contract.FilterLogs(opts, "FundAdded", fromRule)
+	if err != nil {
+		return nil, err
+	}
+	return &WalletFundAddedIterator{contract: _Wallet.contract, event: "FundAdded", logs: logs, sub: sub}, nil
+}
+
+// WatchFundAdded is a free log subscription operation binding the contract event 0xf66fd2ae9e24a6a24b02e1b5b7512ffde5149a4176085fc0298ae228c9b9d729.
+//
+// Solidity: e FundAdded(scriptHash bytes32, from indexed address, valueAdded uint256)
+func (_Wallet *WalletFilterer) WatchFundAdded(opts *bind.WatchOpts, sink chan<- *WalletFundAdded, from []common.Address) (event.Subscription, error) {
+
+	var fromRule []interface{}
+	for _, fromItem := range from {
+		fromRule = append(fromRule, fromItem)
+	}
+
+	logs, sub, err := _Wallet.contract.WatchLogs(opts, "FundAdded", fromRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(WalletFundAdded)
+				if err := _Wallet.contract.UnpackLog(event, "FundAdded", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// WalletFundedIterator is returned from FilterFunded and is used to iterate over the raw logs and unpacked data for Funded events raised by the Wallet contract.
+type WalletFundedIterator struct {
+	Event *WalletFunded // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *WalletFundedIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(WalletFunded)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(WalletFunded)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *WalletFundedIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *WalletFundedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// WalletFunded represents a Funded event raised by the Wallet contract.
+type WalletFunded struct {
+	ScriptHash [32]byte
+	From       common.Address
+	Value      *big.Int
+	Raw        types.Log // Blockchain specific contextual infos
+}
+
+// FilterFunded is a free log retrieval operation binding the contract event 0xce7089d0668849fb9ca29778c0cbf1e764d9efb048d81fd71fb34c94f26db368.
+//
+// Solidity: e Funded(scriptHash bytes32, from indexed address, value uint256)
+func (_Wallet *WalletFilterer) FilterFunded(opts *bind.FilterOpts, from []common.Address) (*WalletFundedIterator, error) {
+
+	var fromRule []interface{}
+	for _, fromItem := range from {
+		fromRule = append(fromRule, fromItem)
+	}
+
+	logs, sub, err := _Wallet.contract.FilterLogs(opts, "Funded", fromRule)
+	if err != nil {
+		return nil, err
+	}
+	return &WalletFundedIterator{contract: _Wallet.contract, event: "Funded", logs: logs, sub: sub}, nil
+}
+
+// WatchFunded is a free log subscription operation binding the contract event 0xce7089d0668849fb9ca29778c0cbf1e764d9efb048d81fd71fb34c94f26db368.
+//
+// Solidity: e Funded(scriptHash bytes32, from indexed address, value uint256)
+func (_Wallet *WalletFilterer) WatchFunded(opts *bind.WatchOpts, sink chan<- *WalletFunded, from []common.Address) (event.Subscription, error) {
+
+	var fromRule []interface{}
+	for _, fromItem := range from {
+		fromRule = append(fromRule, fromItem)
+	}
+
+	logs, sub, err := _Wallet.contract.WatchLogs(opts, "Funded", fromRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(WalletFunded)
+				if err := _Wallet.contract.UnpackLog(event, "Funded", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
 }

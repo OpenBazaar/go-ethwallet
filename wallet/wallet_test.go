@@ -234,7 +234,7 @@ func TestWalletContractAddTransaction(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	auth := bind.NewKeyedTransactor(validRopstenWallet.account.key.PrivateKey)
+	auth := bind.NewKeyedTransactor(validRopstenWallet.account.privateKey)
 
 	auth.Nonce = big.NewInt(int64(nonce))
 	auth.Value = big.NewInt(66778899) // in wei

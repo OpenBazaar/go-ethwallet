@@ -1,5 +1,5 @@
-// This file is an automatically generated Go binding. Do not modify as any
-// change will likely be lost upon the next re-generation!
+// Code generated - DO NOT EDIT.
+// This file is a generated binding and any manual changes will be lost.
 
 package wallet
 
@@ -7,10 +7,12 @@ import (
 	"math/big"
 	"strings"
 
+	ethereum "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/event"
 )
 
 // WalletcmABI is the input ABI used to generate the binding from.
@@ -35,13 +37,14 @@ func DeployWalletcm(auth *bind.TransactOpts, backend bind.ContractBackend) (comm
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
-	return address, tx, &Walletcm{WalletcmCaller: WalletcmCaller{contract: contract}, WalletcmTransactor: WalletcmTransactor{contract: contract}}, nil
+	return address, tx, &Walletcm{WalletcmCaller: WalletcmCaller{contract: contract}, WalletcmTransactor: WalletcmTransactor{contract: contract}, WalletcmFilterer: WalletcmFilterer{contract: contract}}, nil
 }
 
 // Walletcm is an auto generated Go binding around an Ethereum contract.
 type Walletcm struct {
 	WalletcmCaller     // Read-only binding to the contract
 	WalletcmTransactor // Write-only binding to the contract
+	WalletcmFilterer   // Log filterer for contract events
 }
 
 // WalletcmCaller is an auto generated read-only Go binding around an Ethereum contract.
@@ -51,6 +54,11 @@ type WalletcmCaller struct {
 
 // WalletcmTransactor is an auto generated write-only Go binding around an Ethereum contract.
 type WalletcmTransactor struct {
+	contract *bind.BoundContract // Generic contract wrapper for the low level calls
+}
+
+// WalletcmFilterer is an auto generated log filtering Go binding around an Ethereum contract events.
+type WalletcmFilterer struct {
 	contract *bind.BoundContract // Generic contract wrapper for the low level calls
 }
 
@@ -93,16 +101,16 @@ type WalletcmTransactorRaw struct {
 
 // NewWalletcm creates a new instance of Walletcm, bound to a specific deployed contract.
 func NewWalletcm(address common.Address, backend bind.ContractBackend) (*Walletcm, error) {
-	contract, err := bindWalletcm(address, backend, backend)
+	contract, err := bindWalletcm(address, backend, backend, backend)
 	if err != nil {
 		return nil, err
 	}
-	return &Walletcm{WalletcmCaller: WalletcmCaller{contract: contract}, WalletcmTransactor: WalletcmTransactor{contract: contract}}, nil
+	return &Walletcm{WalletcmCaller: WalletcmCaller{contract: contract}, WalletcmTransactor: WalletcmTransactor{contract: contract}, WalletcmFilterer: WalletcmFilterer{contract: contract}}, nil
 }
 
 // NewWalletcmCaller creates a new read-only instance of Walletcm, bound to a specific deployed contract.
 func NewWalletcmCaller(address common.Address, caller bind.ContractCaller) (*WalletcmCaller, error) {
-	contract, err := bindWalletcm(address, caller, nil)
+	contract, err := bindWalletcm(address, caller, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -111,20 +119,29 @@ func NewWalletcmCaller(address common.Address, caller bind.ContractCaller) (*Wal
 
 // NewWalletcmTransactor creates a new write-only instance of Walletcm, bound to a specific deployed contract.
 func NewWalletcmTransactor(address common.Address, transactor bind.ContractTransactor) (*WalletcmTransactor, error) {
-	contract, err := bindWalletcm(address, nil, transactor)
+	contract, err := bindWalletcm(address, nil, transactor, nil)
 	if err != nil {
 		return nil, err
 	}
 	return &WalletcmTransactor{contract: contract}, nil
 }
 
+// NewWalletcmFilterer creates a new log filterer instance of Walletcm, bound to a specific deployed contract.
+func NewWalletcmFilterer(address common.Address, filterer bind.ContractFilterer) (*WalletcmFilterer, error) {
+	contract, err := bindWalletcm(address, nil, nil, filterer)
+	if err != nil {
+		return nil, err
+	}
+	return &WalletcmFilterer{contract: contract}, nil
+}
+
 // bindWalletcm binds a generic wrapper to an already deployed contract.
-func bindWalletcm(address common.Address, caller bind.ContractCaller, transactor bind.ContractTransactor) (*bind.BoundContract, error) {
+func bindWalletcm(address common.Address, caller bind.ContractCaller, transactor bind.ContractTransactor, filterer bind.ContractFilterer) (*bind.BoundContract, error) {
 	parsed, err := abi.JSON(strings.NewReader(WalletcmABI))
 	if err != nil {
 		return nil, err
 	}
-	return bind.NewBoundContract(address, parsed, caller, transactor, nil), nil
+	return bind.NewBoundContract(address, parsed, caller, transactor, filterer), nil
 }
 
 // Call invokes the (constant) contract method with params as input values and
@@ -565,4 +582,1027 @@ func (_Walletcm *WalletcmSession) TransferOwnership(_newOwner common.Address) (*
 // Solidity: function transferOwnership(_newOwner address) returns()
 func (_Walletcm *WalletcmTransactorSession) TransferOwnership(_newOwner common.Address) (*types.Transaction, error) {
 	return _Walletcm.Contract.TransferOwnership(&_Walletcm.TransactOpts, _newOwner)
+}
+
+// WalletcmBugLevelChangedIterator is returned from FilterBugLevelChanged and is used to iterate over the raw logs and unpacked data for BugLevelChanged events raised by the Walletcm contract.
+type WalletcmBugLevelChangedIterator struct {
+	Event *WalletcmBugLevelChanged // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *WalletcmBugLevelChangedIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(WalletcmBugLevelChanged)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(WalletcmBugLevelChanged)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *WalletcmBugLevelChangedIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *WalletcmBugLevelChangedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// WalletcmBugLevelChanged represents a BugLevelChanged event raised by the Walletcm contract.
+type WalletcmBugLevelChanged struct {
+	ContractName string
+	VersionName  string
+	BugLevel     uint8
+	Raw          types.Log // Blockchain specific contextual infos
+}
+
+// FilterBugLevelChanged is a free log retrieval operation binding the contract event 0x92d0e6a4dfcd933ffb179b251aa0d734eb16556c0813246989fddaf08a7d009d.
+//
+// Solidity: e BugLevelChanged(contractName string, versionName string, bugLevel uint8)
+func (_Walletcm *WalletcmFilterer) FilterBugLevelChanged(opts *bind.FilterOpts) (*WalletcmBugLevelChangedIterator, error) {
+
+	logs, sub, err := _Walletcm.contract.FilterLogs(opts, "BugLevelChanged")
+	if err != nil {
+		return nil, err
+	}
+	return &WalletcmBugLevelChangedIterator{contract: _Walletcm.contract, event: "BugLevelChanged", logs: logs, sub: sub}, nil
+}
+
+// WatchBugLevelChanged is a free log subscription operation binding the contract event 0x92d0e6a4dfcd933ffb179b251aa0d734eb16556c0813246989fddaf08a7d009d.
+//
+// Solidity: e BugLevelChanged(contractName string, versionName string, bugLevel uint8)
+func (_Walletcm *WalletcmFilterer) WatchBugLevelChanged(opts *bind.WatchOpts, sink chan<- *WalletcmBugLevelChanged) (event.Subscription, error) {
+
+	logs, sub, err := _Walletcm.contract.WatchLogs(opts, "BugLevelChanged")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(WalletcmBugLevelChanged)
+				if err := _Walletcm.contract.UnpackLog(event, "BugLevelChanged", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// WalletcmOwnershipRenouncedIterator is returned from FilterOwnershipRenounced and is used to iterate over the raw logs and unpacked data for OwnershipRenounced events raised by the Walletcm contract.
+type WalletcmOwnershipRenouncedIterator struct {
+	Event *WalletcmOwnershipRenounced // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *WalletcmOwnershipRenouncedIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(WalletcmOwnershipRenounced)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(WalletcmOwnershipRenounced)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *WalletcmOwnershipRenouncedIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *WalletcmOwnershipRenouncedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// WalletcmOwnershipRenounced represents a OwnershipRenounced event raised by the Walletcm contract.
+type WalletcmOwnershipRenounced struct {
+	PreviousOwner common.Address
+	Raw           types.Log // Blockchain specific contextual infos
+}
+
+// FilterOwnershipRenounced is a free log retrieval operation binding the contract event 0xf8df31144d9c2f0f6b59d69b8b98abd5459d07f2742c4df920b25aae33c64820.
+//
+// Solidity: e OwnershipRenounced(previousOwner indexed address)
+func (_Walletcm *WalletcmFilterer) FilterOwnershipRenounced(opts *bind.FilterOpts, previousOwner []common.Address) (*WalletcmOwnershipRenouncedIterator, error) {
+
+	var previousOwnerRule []interface{}
+	for _, previousOwnerItem := range previousOwner {
+		previousOwnerRule = append(previousOwnerRule, previousOwnerItem)
+	}
+
+	logs, sub, err := _Walletcm.contract.FilterLogs(opts, "OwnershipRenounced", previousOwnerRule)
+	if err != nil {
+		return nil, err
+	}
+	return &WalletcmOwnershipRenouncedIterator{contract: _Walletcm.contract, event: "OwnershipRenounced", logs: logs, sub: sub}, nil
+}
+
+// WatchOwnershipRenounced is a free log subscription operation binding the contract event 0xf8df31144d9c2f0f6b59d69b8b98abd5459d07f2742c4df920b25aae33c64820.
+//
+// Solidity: e OwnershipRenounced(previousOwner indexed address)
+func (_Walletcm *WalletcmFilterer) WatchOwnershipRenounced(opts *bind.WatchOpts, sink chan<- *WalletcmOwnershipRenounced, previousOwner []common.Address) (event.Subscription, error) {
+
+	var previousOwnerRule []interface{}
+	for _, previousOwnerItem := range previousOwner {
+		previousOwnerRule = append(previousOwnerRule, previousOwnerItem)
+	}
+
+	logs, sub, err := _Walletcm.contract.WatchLogs(opts, "OwnershipRenounced", previousOwnerRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(WalletcmOwnershipRenounced)
+				if err := _Walletcm.contract.UnpackLog(event, "OwnershipRenounced", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// WalletcmOwnershipTransferredIterator is returned from FilterOwnershipTransferred and is used to iterate over the raw logs and unpacked data for OwnershipTransferred events raised by the Walletcm contract.
+type WalletcmOwnershipTransferredIterator struct {
+	Event *WalletcmOwnershipTransferred // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *WalletcmOwnershipTransferredIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(WalletcmOwnershipTransferred)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(WalletcmOwnershipTransferred)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *WalletcmOwnershipTransferredIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *WalletcmOwnershipTransferredIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// WalletcmOwnershipTransferred represents a OwnershipTransferred event raised by the Walletcm contract.
+type WalletcmOwnershipTransferred struct {
+	PreviousOwner common.Address
+	NewOwner      common.Address
+	Raw           types.Log // Blockchain specific contextual infos
+}
+
+// FilterOwnershipTransferred is a free log retrieval operation binding the contract event 0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0.
+//
+// Solidity: e OwnershipTransferred(previousOwner indexed address, newOwner indexed address)
+func (_Walletcm *WalletcmFilterer) FilterOwnershipTransferred(opts *bind.FilterOpts, previousOwner []common.Address, newOwner []common.Address) (*WalletcmOwnershipTransferredIterator, error) {
+
+	var previousOwnerRule []interface{}
+	for _, previousOwnerItem := range previousOwner {
+		previousOwnerRule = append(previousOwnerRule, previousOwnerItem)
+	}
+	var newOwnerRule []interface{}
+	for _, newOwnerItem := range newOwner {
+		newOwnerRule = append(newOwnerRule, newOwnerItem)
+	}
+
+	logs, sub, err := _Walletcm.contract.FilterLogs(opts, "OwnershipTransferred", previousOwnerRule, newOwnerRule)
+	if err != nil {
+		return nil, err
+	}
+	return &WalletcmOwnershipTransferredIterator{contract: _Walletcm.contract, event: "OwnershipTransferred", logs: logs, sub: sub}, nil
+}
+
+// WatchOwnershipTransferred is a free log subscription operation binding the contract event 0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0.
+//
+// Solidity: e OwnershipTransferred(previousOwner indexed address, newOwner indexed address)
+func (_Walletcm *WalletcmFilterer) WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *WalletcmOwnershipTransferred, previousOwner []common.Address, newOwner []common.Address) (event.Subscription, error) {
+
+	var previousOwnerRule []interface{}
+	for _, previousOwnerItem := range previousOwner {
+		previousOwnerRule = append(previousOwnerRule, previousOwnerItem)
+	}
+	var newOwnerRule []interface{}
+	for _, newOwnerItem := range newOwner {
+		newOwnerRule = append(newOwnerRule, newOwnerItem)
+	}
+
+	logs, sub, err := _Walletcm.contract.WatchLogs(opts, "OwnershipTransferred", previousOwnerRule, newOwnerRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(WalletcmOwnershipTransferred)
+				if err := _Walletcm.contract.UnpackLog(event, "OwnershipTransferred", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// WalletcmRecommendedVersionRemovedIterator is returned from FilterRecommendedVersionRemoved and is used to iterate over the raw logs and unpacked data for RecommendedVersionRemoved events raised by the Walletcm contract.
+type WalletcmRecommendedVersionRemovedIterator struct {
+	Event *WalletcmRecommendedVersionRemoved // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *WalletcmRecommendedVersionRemovedIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(WalletcmRecommendedVersionRemoved)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(WalletcmRecommendedVersionRemoved)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *WalletcmRecommendedVersionRemovedIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *WalletcmRecommendedVersionRemovedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// WalletcmRecommendedVersionRemoved represents a RecommendedVersionRemoved event raised by the Walletcm contract.
+type WalletcmRecommendedVersionRemoved struct {
+	ContractName string
+	Raw          types.Log // Blockchain specific contextual infos
+}
+
+// FilterRecommendedVersionRemoved is a free log retrieval operation binding the contract event 0x07b20feb74e0118ee3c73d4cb8d0eb4da169604c68aa233293b094cedcd225f2.
+//
+// Solidity: e RecommendedVersionRemoved(contractName string)
+func (_Walletcm *WalletcmFilterer) FilterRecommendedVersionRemoved(opts *bind.FilterOpts) (*WalletcmRecommendedVersionRemovedIterator, error) {
+
+	logs, sub, err := _Walletcm.contract.FilterLogs(opts, "RecommendedVersionRemoved")
+	if err != nil {
+		return nil, err
+	}
+	return &WalletcmRecommendedVersionRemovedIterator{contract: _Walletcm.contract, event: "RecommendedVersionRemoved", logs: logs, sub: sub}, nil
+}
+
+// WatchRecommendedVersionRemoved is a free log subscription operation binding the contract event 0x07b20feb74e0118ee3c73d4cb8d0eb4da169604c68aa233293b094cedcd225f2.
+//
+// Solidity: e RecommendedVersionRemoved(contractName string)
+func (_Walletcm *WalletcmFilterer) WatchRecommendedVersionRemoved(opts *bind.WatchOpts, sink chan<- *WalletcmRecommendedVersionRemoved) (event.Subscription, error) {
+
+	logs, sub, err := _Walletcm.contract.WatchLogs(opts, "RecommendedVersionRemoved")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(WalletcmRecommendedVersionRemoved)
+				if err := _Walletcm.contract.UnpackLog(event, "RecommendedVersionRemoved", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// WalletcmStatusChangedIterator is returned from FilterStatusChanged and is used to iterate over the raw logs and unpacked data for StatusChanged events raised by the Walletcm contract.
+type WalletcmStatusChangedIterator struct {
+	Event *WalletcmStatusChanged // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *WalletcmStatusChangedIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(WalletcmStatusChanged)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(WalletcmStatusChanged)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *WalletcmStatusChangedIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *WalletcmStatusChangedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// WalletcmStatusChanged represents a StatusChanged event raised by the Walletcm contract.
+type WalletcmStatusChanged struct {
+	ContractName string
+	VersionName  string
+	Status       uint8
+	Raw          types.Log // Blockchain specific contextual infos
+}
+
+// FilterStatusChanged is a free log retrieval operation binding the contract event 0x00a1d2d212fdb196f10c2b940b5f032473f79d8fcf0739ae900d576750021387.
+//
+// Solidity: e StatusChanged(contractName string, versionName string, status uint8)
+func (_Walletcm *WalletcmFilterer) FilterStatusChanged(opts *bind.FilterOpts) (*WalletcmStatusChangedIterator, error) {
+
+	logs, sub, err := _Walletcm.contract.FilterLogs(opts, "StatusChanged")
+	if err != nil {
+		return nil, err
+	}
+	return &WalletcmStatusChangedIterator{contract: _Walletcm.contract, event: "StatusChanged", logs: logs, sub: sub}, nil
+}
+
+// WatchStatusChanged is a free log subscription operation binding the contract event 0x00a1d2d212fdb196f10c2b940b5f032473f79d8fcf0739ae900d576750021387.
+//
+// Solidity: e StatusChanged(contractName string, versionName string, status uint8)
+func (_Walletcm *WalletcmFilterer) WatchStatusChanged(opts *bind.WatchOpts, sink chan<- *WalletcmStatusChanged) (event.Subscription, error) {
+
+	logs, sub, err := _Walletcm.contract.WatchLogs(opts, "StatusChanged")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(WalletcmStatusChanged)
+				if err := _Walletcm.contract.UnpackLog(event, "StatusChanged", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// WalletcmVersionAddedIterator is returned from FilterVersionAdded and is used to iterate over the raw logs and unpacked data for VersionAdded events raised by the Walletcm contract.
+type WalletcmVersionAddedIterator struct {
+	Event *WalletcmVersionAdded // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *WalletcmVersionAddedIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(WalletcmVersionAdded)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(WalletcmVersionAdded)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *WalletcmVersionAddedIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *WalletcmVersionAddedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// WalletcmVersionAdded represents a VersionAdded event raised by the Walletcm contract.
+type WalletcmVersionAdded struct {
+	ContractName   string
+	VersionName    string
+	Implementation common.Address
+	Raw            types.Log // Blockchain specific contextual infos
+}
+
+// FilterVersionAdded is a free log retrieval operation binding the contract event 0x337b109e3f497728f2bdd27545c9ed1cb52ed4a4103cc94da88b868879c982e2.
+//
+// Solidity: e VersionAdded(contractName string, versionName string, implementation indexed address)
+func (_Walletcm *WalletcmFilterer) FilterVersionAdded(opts *bind.FilterOpts, implementation []common.Address) (*WalletcmVersionAddedIterator, error) {
+
+	var implementationRule []interface{}
+	for _, implementationItem := range implementation {
+		implementationRule = append(implementationRule, implementationItem)
+	}
+
+	logs, sub, err := _Walletcm.contract.FilterLogs(opts, "VersionAdded", implementationRule)
+	if err != nil {
+		return nil, err
+	}
+	return &WalletcmVersionAddedIterator{contract: _Walletcm.contract, event: "VersionAdded", logs: logs, sub: sub}, nil
+}
+
+// WatchVersionAdded is a free log subscription operation binding the contract event 0x337b109e3f497728f2bdd27545c9ed1cb52ed4a4103cc94da88b868879c982e2.
+//
+// Solidity: e VersionAdded(contractName string, versionName string, implementation indexed address)
+func (_Walletcm *WalletcmFilterer) WatchVersionAdded(opts *bind.WatchOpts, sink chan<- *WalletcmVersionAdded, implementation []common.Address) (event.Subscription, error) {
+
+	var implementationRule []interface{}
+	for _, implementationItem := range implementation {
+		implementationRule = append(implementationRule, implementationItem)
+	}
+
+	logs, sub, err := _Walletcm.contract.WatchLogs(opts, "VersionAdded", implementationRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(WalletcmVersionAdded)
+				if err := _Walletcm.contract.UnpackLog(event, "VersionAdded", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// WalletcmVersionAuditedIterator is returned from FilterVersionAudited and is used to iterate over the raw logs and unpacked data for VersionAudited events raised by the Walletcm contract.
+type WalletcmVersionAuditedIterator struct {
+	Event *WalletcmVersionAudited // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *WalletcmVersionAuditedIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(WalletcmVersionAudited)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(WalletcmVersionAudited)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *WalletcmVersionAuditedIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *WalletcmVersionAuditedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// WalletcmVersionAudited represents a VersionAudited event raised by the Walletcm contract.
+type WalletcmVersionAudited struct {
+	ContractName string
+	VersionName  string
+	Raw          types.Log // Blockchain specific contextual infos
+}
+
+// FilterVersionAudited is a free log retrieval operation binding the contract event 0xdd2996df4158c05ae76d843c929d03eadde75cf3580d1d2f996375ea6cbe9625.
+//
+// Solidity: e VersionAudited(contractName string, versionName string)
+func (_Walletcm *WalletcmFilterer) FilterVersionAudited(opts *bind.FilterOpts) (*WalletcmVersionAuditedIterator, error) {
+
+	logs, sub, err := _Walletcm.contract.FilterLogs(opts, "VersionAudited")
+	if err != nil {
+		return nil, err
+	}
+	return &WalletcmVersionAuditedIterator{contract: _Walletcm.contract, event: "VersionAudited", logs: logs, sub: sub}, nil
+}
+
+// WatchVersionAudited is a free log subscription operation binding the contract event 0xdd2996df4158c05ae76d843c929d03eadde75cf3580d1d2f996375ea6cbe9625.
+//
+// Solidity: e VersionAudited(contractName string, versionName string)
+func (_Walletcm *WalletcmFilterer) WatchVersionAudited(opts *bind.WatchOpts, sink chan<- *WalletcmVersionAudited) (event.Subscription, error) {
+
+	logs, sub, err := _Walletcm.contract.WatchLogs(opts, "VersionAudited")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(WalletcmVersionAudited)
+				if err := _Walletcm.contract.UnpackLog(event, "VersionAudited", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// WalletcmVersionRecommendedIterator is returned from FilterVersionRecommended and is used to iterate over the raw logs and unpacked data for VersionRecommended events raised by the Walletcm contract.
+type WalletcmVersionRecommendedIterator struct {
+	Event *WalletcmVersionRecommended // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *WalletcmVersionRecommendedIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(WalletcmVersionRecommended)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(WalletcmVersionRecommended)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *WalletcmVersionRecommendedIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *WalletcmVersionRecommendedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// WalletcmVersionRecommended represents a VersionRecommended event raised by the Walletcm contract.
+type WalletcmVersionRecommended struct {
+	ContractName string
+	VersionName  string
+	Raw          types.Log // Blockchain specific contextual infos
+}
+
+// FilterVersionRecommended is a free log retrieval operation binding the contract event 0xb318550bf93edf51de4bae84db3deabd2a866cc407435a72317ca2503e2a07a6.
+//
+// Solidity: e VersionRecommended(contractName string, versionName string)
+func (_Walletcm *WalletcmFilterer) FilterVersionRecommended(opts *bind.FilterOpts) (*WalletcmVersionRecommendedIterator, error) {
+
+	logs, sub, err := _Walletcm.contract.FilterLogs(opts, "VersionRecommended")
+	if err != nil {
+		return nil, err
+	}
+	return &WalletcmVersionRecommendedIterator{contract: _Walletcm.contract, event: "VersionRecommended", logs: logs, sub: sub}, nil
+}
+
+// WatchVersionRecommended is a free log subscription operation binding the contract event 0xb318550bf93edf51de4bae84db3deabd2a866cc407435a72317ca2503e2a07a6.
+//
+// Solidity: e VersionRecommended(contractName string, versionName string)
+func (_Walletcm *WalletcmFilterer) WatchVersionRecommended(opts *bind.WatchOpts, sink chan<- *WalletcmVersionRecommended) (event.Subscription, error) {
+
+	logs, sub, err := _Walletcm.contract.WatchLogs(opts, "VersionRecommended")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(WalletcmVersionRecommended)
+				if err := _Walletcm.contract.UnpackLog(event, "VersionRecommended", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
 }
