@@ -248,7 +248,7 @@ func TestWalletContractAddTransaction(t *testing.T) {
 	fmt.Println("timeout : ", script.Timeout)
 	fmt.Println("scrptHash : ", shash)
 
-	smtct, err := NewWallet(ver.Implementation, validRopstenWallet.client)
+	smtct, err := NewEscrow(ver.Implementation, validRopstenWallet.client)
 	if err != nil {
 		t.Errorf("error initilaizing contract failed: %s", err.Error())
 	}

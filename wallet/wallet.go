@@ -77,8 +77,8 @@ type EthereumWallet struct {
 	account  *Account
 	address  *EthAddress
 	service  *Service
-	registry *Walletcm
-	ppsct    *Wallet
+	registry *Registry
+	ppsct    *Escrow
 }
 
 // NewEthereumWalletWithKeyfile will return a reference to the Eth Wallet
@@ -106,7 +106,7 @@ func NewEthereumWalletWithKeyfile(url, keyFile, passwd string) *EthereumWallet {
 		log.Fatalf("ethereum config not valid: %s", err.Error())
 	}
 
-	reg, err := NewWalletcm(common.HexToAddress(ethConfig.RegistryAddress), client)
+	reg, err := NewRegistry(common.HexToAddress(ethConfig.RegistryAddress), client)
 	if err != nil {
 		log.Fatalf("error initilaizing contract failed: %s", err.Error())
 	}
@@ -178,7 +178,7 @@ func NewEthereumWallet(cfg config.CoinConfig, mnemonic string) (*EthereumWallet,
 		}
 	*/
 
-	reg, err := NewWalletcm(common.HexToAddress(ethConfig.RegistryAddress), client)
+	reg, err := NewRegistry(common.HexToAddress(ethConfig.RegistryAddress), client)
 	if err != nil {
 		log.Errorf("error initilaizing contract failed: %s", err.Error())
 		return nil, err
@@ -425,7 +425,7 @@ func (wallet *EthereumWallet) GenerateMultisigScript(keys []hd.ExtendedKey, thre
 		return nil, nil, errors.New("no escrow contract available")
 	}
 
-	smtct, err := NewWallet(ver.Implementation, wallet.client)
+	smtct, err := NewEscrow(ver.Implementation, wallet.client)
 	if err != nil {
 		log.Fatalf("error initilaizing contract failed: %s", err.Error())
 	}
@@ -563,7 +563,7 @@ func (wallet *EthereumWallet) Multisign(ins []wi.TransactionInput, outs []wi.Tra
 		return nil, err
 	}
 
-	smtct, err := NewWallet(rScript.MultisigAddress, wallet.client)
+	smtct, err := NewEscrow(rScript.MultisigAddress, wallet.client)
 	if err != nil {
 		log.Fatalf("error initilaizing contract failed: %s", err.Error())
 	}

@@ -10,7 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
-	bip39 "github.com/tyler-smith/go-bip39"
+	"github.com/tyler-smith/go-bip39"
 )
 
 // EthAddress implements the WalletAddress interface
