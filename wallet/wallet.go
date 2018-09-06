@@ -79,6 +79,7 @@ type EthereumWallet struct {
 	service  *Service
 	registry *Registry
 	ppsct    *Escrow
+	db       wi.Datastore
 }
 
 // NewEthereumWalletWithKeyfile will return a reference to the Eth Wallet
@@ -118,7 +119,7 @@ func NewEthereumWalletWithKeyfile(url, keyFile, passwd string) *EthereumWallet {
 	//	log.Fatalf("error initilaizing contract failed: %s", err.Error())
 	//}
 
-	return &EthereumWallet{client, myAccount, &EthAddress{&addr}, &Service{}, reg, nil}
+	return &EthereumWallet{client, myAccount, &EthAddress{&addr}, &Service{}, reg, nil, nil}
 }
 
 // NewEthereumWallet will return a reference to the Eth Wallet
@@ -191,7 +192,7 @@ func NewEthereumWallet(cfg config.CoinConfig, mnemonic string) (*EthereumWallet,
 	//	log.Fatalf("error initilaizing contract failed: %s", err.Error())
 	//}
 
-	return &EthereumWallet{client, myAccount, &EthAddress{&addr}, &Service{}, reg, nil}, nil
+	return &EthereumWallet{client, myAccount, &EthAddress{&addr}, &Service{}, reg, nil, cfg.DB}, nil
 }
 
 // Params - return nil to comply
