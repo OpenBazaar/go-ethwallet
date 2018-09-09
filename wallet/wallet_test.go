@@ -5,9 +5,11 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"net/url"
 	"testing"
 	"time"
 
+	"github.com/OpenBazaar/multiwallet/config"
 	wi "github.com/OpenBazaar/wallet-interface"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -28,8 +30,12 @@ var destWallet *EthereumWallet
 
 var script EthRedeemScript
 
+var cfg config.CoinConfig
+
 func setupRopstenWallet() {
-	validRopstenWallet = NewEthereumWalletWithKeyfile(validRopstenURL, validKeyFile, validPassword)
+	//validRopstenWallet = NewEthereumWalletWithKeyfile(validRopstenURL, validKeyFile, validPassword)
+	setupCoinConfig()
+	validRopstenWallet, _ = NewEthereumWallet(cfg, mnemonicStr)
 }
 
 func setupDestWallet() {
@@ -46,7 +52,15 @@ func setupEthRedeemScript(timeout time.Duration, threshold int) {
 	script.Seller = common.HexToAddress(validDestinationAddress)
 }
 
-func TestNewWalletWithValidValues(t *testing.T) {
+func setupCoinConfig() {
+	clientURL, _ := url.Parse("https://ropsten.infura.io")
+	cfg.ClientAPI = *clientURL
+	cfg.CoinType = wi.Ethereum
+	cfg.Options = make(map[string]interface{})
+	cfg.Options["RegistryAddress"] = "0x029d6a0cd4ce98315690f4ea52945545d9c0f460"
+}
+
+func TestNewWalletWithValidKeyfileValues(t *testing.T) {
 	wallet := NewEthereumWalletWithKeyfile(validRopstenURL, validKeyFile, validPassword)
 	if wallet == nil {
 		t.Errorf("valid credentials should return a wallet")
@@ -61,6 +75,19 @@ func TestNewWalletWithInValidValues(t *testing.T) {
 	wallet := NewEthereumWalletWithKeyfile(validRopstenURL, validKeyFile, invalidPassword)
 	if wallet != nil {
 		t.Errorf("invalid credentials should return a wallet")
+	}
+}
+
+func TestNewWalletWithValidCoinConfigValues(t *testing.T) {
+	setupCoinConfig()
+	wallet, err := NewEthereumWallet(cfg, mnemonicStr)
+	if err != nil || wallet == nil {
+		t.Errorf("valid credentials should return a wallet")
+	}
+	fmt.Println(wallet.address.String())
+	fmt.Println(validSourceAddress)
+	if wallet.address.String() != mnemonicStrAddress {
+		t.Errorf("valid credentials should return a wallet with proper initialization")
 	}
 }
 
@@ -168,7 +195,7 @@ func TestWalletCurrentAddress(t *testing.T) {
 
 	addr := validRopstenWallet.CurrentAddress(wi.EXTERNAL)
 
-	if addr.String() != validSourceAddress {
+	if addr.String() != mnemonicStrAddress {
 		t.Errorf("wallet should return correct current address")
 	}
 }

@@ -3,7 +3,6 @@ package wallet
 import (
 	"fmt"
 	"math/big"
-	"os"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
@@ -39,7 +38,7 @@ func init() {
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}
-	validInfuraKey = os.Getenv("INFURA_KEY")
+	validInfuraKey = InfuraAPIKey // os.Getenv("INFURA_KEY")
 	fmt.Println("valid infura key is : ", validInfuraKey)
 
 	ropstenURL = fmt.Sprintf("https://ropsten.infura.io/%s", validInfuraKey)

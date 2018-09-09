@@ -34,6 +34,11 @@ import (
 	"github.com/OpenBazaar/go-ethwallet/util"
 )
 
+const (
+	// InfuraAPIKey is the hard coded Infura API key
+	InfuraAPIKey = "openbazaar"
+)
+
 // EthConfiguration - used for eth specific configuration
 type EthConfiguration struct {
 	RopstenPPAddress string `yaml:"ROPSTEN_PPv2_ADDRESS"`
@@ -124,7 +129,7 @@ func NewEthereumWalletWithKeyfile(url, keyFile, passwd string) *EthereumWallet {
 
 // NewEthereumWallet will return a reference to the Eth Wallet
 func NewEthereumWallet(cfg config.CoinConfig, mnemonic string) (*EthereumWallet, error) {
-	client, err := NewEthClient(cfg.ClientAPI.String())
+	client, err := NewEthClient(cfg.ClientAPI.String() + "/" + InfuraAPIKey)
 	if err != nil {
 		log.Errorf("error initializing wallet: %v", err)
 		return nil, err
