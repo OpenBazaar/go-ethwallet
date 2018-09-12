@@ -24,22 +24,23 @@ import (
 )
 
 var validRopstenURL = fmt.Sprintf("https://ropsten.infura.io/%s", validInfuraKey)
+var validRinkebyURL = fmt.Sprintf("https://rinkeby.infura.io/%s", validInfuraKey)
 
-var validRopstenWallet *EthereumWallet
+var validSampleWallet *EthereumWallet
 var destWallet *EthereumWallet
 
 var script EthRedeemScript
 
 var cfg config.CoinConfig
 
-func setupRopstenWallet() {
+func setupSourceWallet() {
 	//validRopstenWallet = NewEthereumWalletWithKeyfile(validRopstenURL, validKeyFile, validPassword)
-	setupCoinConfig()
-	validRopstenWallet, _ = NewEthereumWallet(cfg, mnemonicStr)
+	setupCoinConfigRinkeby()
+	validSampleWallet, _ = NewEthereumWallet(cfg, mnemonicStr)
 }
 
 func setupDestWallet() {
-	destWallet = NewEthereumWalletWithKeyfile(validRopstenURL,
+	destWallet = NewEthereumWalletWithKeyfile(validRinkebyURL,
 		"../test/UTC--2018-06-16T20-09-33.726552102Z--cecb952de5b23950b15bfd49302d1bdd25f9ee67", validPassword)
 }
 
@@ -52,12 +53,20 @@ func setupEthRedeemScript(timeout time.Duration, threshold int) {
 	script.Seller = common.HexToAddress(validDestinationAddress)
 }
 
-func setupCoinConfig() {
+func setupCoinConfigRopsten() {
 	clientURL, _ := url.Parse("https://ropsten.infura.io")
 	cfg.ClientAPI = *clientURL
 	cfg.CoinType = wi.Ethereum
 	cfg.Options = make(map[string]interface{})
 	cfg.Options["RegistryAddress"] = "0x029d6a0cd4ce98315690f4ea52945545d9c0f460"
+}
+
+func setupCoinConfigRinkeby() {
+	clientURL, _ := url.Parse("https://rinkeby.infura.io")
+	cfg.ClientAPI = *clientURL
+	cfg.CoinType = wi.Ethereum
+	cfg.Options = make(map[string]interface{})
+	cfg.Options["RegistryAddress"] = "0xab8dd0e05b73529b440d9c9df00b5f490c8596ff"
 }
 
 func TestNewWalletWithValidKeyfileValues(t *testing.T) {
@@ -79,7 +88,7 @@ func TestNewWalletWithInValidValues(t *testing.T) {
 }
 
 func TestNewWalletWithValidCoinConfigValues(t *testing.T) {
-	setupCoinConfig()
+	setupCoinConfigRinkeby()
 	wallet, err := NewEthereumWallet(cfg, mnemonicStr)
 	if err != nil || wallet == nil {
 		t.Errorf("valid credentials should return a wallet")
@@ -92,33 +101,33 @@ func TestNewWalletWithValidCoinConfigValues(t *testing.T) {
 }
 
 func TestWalletGetBalance(t *testing.T) {
-	setupRopstenWallet()
+	setupSourceWallet()
 
-	if _, err := validRopstenWallet.GetBalance(); err != nil {
+	if _, err := validSampleWallet.GetBalance(); err != nil {
 		t.Errorf("valid wallet should return balance")
 	}
 }
 
 func TestWalletGetUnconfirmedBalance(t *testing.T) {
-	setupRopstenWallet()
+	setupSourceWallet()
 
-	if _, err := validRopstenWallet.GetUnconfirmedBalance(); err != nil {
+	if _, err := validSampleWallet.GetUnconfirmedBalance(); err != nil {
 		t.Errorf("valid wallet should return unconfirmed balance")
 	}
 }
 
 func TestWalletTransfer(t *testing.T) {
 	//t.SkipNow()
-	setupRopstenWallet()
+	setupSourceWallet()
 	setupDestWallet()
 
-	value := big.NewInt(200000)
+	value := big.NewInt(2000000000)
 
 	sbal1 := big.NewInt(0)
 	dbal1 := big.NewInt(0)
 
-	cbal1, _ := validRopstenWallet.GetBalance()
-	ucbal1, _ := validRopstenWallet.GetUnconfirmedBalance()
+	cbal1, _ := validSampleWallet.GetBalance()
+	ucbal1, _ := validSampleWallet.GetUnconfirmedBalance()
 
 	cbal2, _ := destWallet.GetBalance()
 	ucbal2, _ := destWallet.GetUnconfirmedBalance()
@@ -126,7 +135,7 @@ func TestWalletTransfer(t *testing.T) {
 	sbal1.Add(cbal1, ucbal1)
 	dbal1.Add(cbal2, ucbal2)
 
-	_, err := validRopstenWallet.Transfer(validDestinationAddress, value)
+	_, err := validSampleWallet.Transfer(validDestinationAddress, value)
 
 	if err != nil {
 		t.Errorf("valid wallet should allow transfer")
@@ -151,8 +160,8 @@ func TestWalletTransfer(t *testing.T) {
 	sbal2 := big.NewInt(0)
 	dbal2 := big.NewInt(0)
 
-	cbal1, _ = validRopstenWallet.GetBalance()
-	ucbal1, _ = validRopstenWallet.GetUnconfirmedBalance()
+	cbal1, _ = validSampleWallet.GetBalance()
+	ucbal1, _ = validSampleWallet.GetUnconfirmedBalance()
 
 	cbal2, _ = destWallet.GetBalance()
 	ucbal2, _ = destWallet.GetUnconfirmedBalance()
@@ -171,29 +180,29 @@ func TestWalletTransfer(t *testing.T) {
 }
 
 func TestWalletCurrencyCode(t *testing.T) {
-	setupRopstenWallet()
+	setupSourceWallet()
 
-	if validRopstenWallet.CurrencyCode() != "ETH" {
+	if validSampleWallet.CurrencyCode() != "ETH" {
 		t.Errorf("wallet should return proper currency code")
 	}
 }
 
 func TestWalletIsDust(t *testing.T) {
-	setupRopstenWallet()
+	setupSourceWallet()
 
-	if validRopstenWallet.IsDust(int64(10000 + 10000)) {
+	if validSampleWallet.IsDust(int64(10000 + 10000)) {
 		t.Errorf("wallet should not indicate wrong dust")
 	}
 
-	if !validRopstenWallet.IsDust(int64(10000 - 100)) {
+	if !validSampleWallet.IsDust(int64(10000 - 100)) {
 		t.Errorf("wallet should not indicate wrong dust")
 	}
 }
 
 func TestWalletCurrentAddress(t *testing.T) {
-	setupRopstenWallet()
+	setupSourceWallet()
 
-	addr := validRopstenWallet.CurrentAddress(wi.EXTERNAL)
+	addr := validSampleWallet.CurrentAddress(wi.EXTERNAL)
 
 	if addr.String() != mnemonicStrAddress {
 		t.Errorf("wallet should return correct current address")
@@ -201,19 +210,19 @@ func TestWalletCurrentAddress(t *testing.T) {
 }
 
 func TestWalletNewAddress(t *testing.T) {
-	setupRopstenWallet()
+	setupSourceWallet()
 
-	addr := validRopstenWallet.NewAddress(wi.EXTERNAL)
+	addr := validSampleWallet.NewAddress(wi.EXTERNAL)
 
-	if addr.String() != validSourceAddress {
+	if addr.String() != mnemonicStrAddress {
 		t.Errorf("wallet should return correct new address")
 	}
 }
 
 func TestWalletContractAddTransaction(t *testing.T) {
-	setupRopstenWallet()
+	setupSourceWallet()
 
-	ver, err := validRopstenWallet.registry.GetRecommendedVersion(nil, "escrow")
+	ver, err := validSampleWallet.registry.GetRecommendedVersion(nil, "escrow")
 	if err != nil {
 		t.Error("error fetching escrow from registry")
 	}
@@ -252,16 +261,16 @@ func TestWalletContractAddTransaction(t *testing.T) {
 
 	fmt.Println("s1 and s2 are equal? : ", bytes.Equal(s1[:], s2[:]))
 
-	fromAddress := validRopstenWallet.account.Address()
-	nonce, err := validRopstenWallet.client.PendingNonceAt(context.Background(), fromAddress)
+	fromAddress := validSampleWallet.account.Address()
+	nonce, err := validSampleWallet.client.PendingNonceAt(context.Background(), fromAddress)
 	if err != nil {
 		log.Fatal(err)
 	}
-	gasPrice, err := validRopstenWallet.client.SuggestGasPrice(context.Background())
+	gasPrice, err := validSampleWallet.client.SuggestGasPrice(context.Background())
 	if err != nil {
 		log.Fatal(err)
 	}
-	auth := bind.NewKeyedTransactor(validRopstenWallet.account.privateKey)
+	auth := bind.NewKeyedTransactor(validSampleWallet.account.privateKey)
 
 	auth.Nonce = big.NewInt(int64(nonce))
 	auth.Value = big.NewInt(66778899) // in wei
@@ -275,7 +284,7 @@ func TestWalletContractAddTransaction(t *testing.T) {
 	fmt.Println("timeout : ", script.Timeout)
 	fmt.Println("scrptHash : ", shash)
 
-	smtct, err := NewEscrow(ver.Implementation, validRopstenWallet.client)
+	smtct, err := NewEscrow(ver.Implementation, validSampleWallet.client)
 	if err != nil {
 		t.Errorf("error initilaizing contract failed: %s", err.Error())
 	}
