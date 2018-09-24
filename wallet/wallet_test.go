@@ -36,7 +36,7 @@ var cfg config.CoinConfig
 func setupSourceWallet() {
 	//validRopstenWallet = NewEthereumWalletWithKeyfile(validRopstenURL, validKeyFile, validPassword)
 	setupCoinConfigRinkeby()
-	validSampleWallet, _ = NewEthereumWallet(cfg, mnemonicStr)
+	validSampleWallet, _ = NewEthereumWallet(cfg, mnemonicStr, nil)
 }
 
 func setupDestWallet() {
@@ -89,7 +89,7 @@ func TestNewWalletWithInValidValues(t *testing.T) {
 
 func TestNewWalletWithValidCoinConfigValues(t *testing.T) {
 	setupCoinConfigRinkeby()
-	wallet, err := NewEthereumWallet(cfg, mnemonicStr)
+	wallet, err := NewEthereumWallet(cfg, mnemonicStr, nil)
 	if err != nil || wallet == nil {
 		t.Errorf("valid credentials should return a wallet")
 	}
