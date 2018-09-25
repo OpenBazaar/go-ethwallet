@@ -108,7 +108,11 @@ func (z *EthereumPriceFetcher) GetAllRates(cacheOK bool) (map[string]float64, er
 	}
 	z.Lock()
 	defer z.Unlock()
-	return z.cache, nil
+	copy := make(map[string]float64, len(z.cache))
+	for k, v := range z.cache {
+		copy[k] = v
+	}
+	return copy, nil
 }
 
 // UnitsPerCoin - return satoshis in 1 BTC
@@ -155,7 +159,11 @@ func (provider *ExchangeRateProvider) fetch() (err error) {
 }
 
 func (b OpenBazaarDecoder) decode(dat interface{}, cache map[string]float64, bp *exchange.BitcoinPriceFetcher) (err error) {
-	data := dat.(map[string]interface{})
+	//data := dat.(map[string]interface{})
+	data, ok := dat.(map[string]interface{})
+	if !ok {
+		return errors.New(reflect.TypeOf(b).Name() + ".decode: type assertion failed invalid json")
+	}
 
 	eth, ok := data["ETH"]
 	if !ok {
@@ -309,25 +317,29 @@ func (b PoloniexDecoder) decode(dat interface{}, cache map[string]float64, bp *e
 	if err != nil {
 		return err
 	}
-	data := dat.(map[string]interface{})
-	var rate float64
-	for k, v := range data {
-		if k == "BTC_ETH" {
-			val, ok := v.(map[string]interface{})
-			if !ok {
-				return errors.New(reflect.TypeOf(b).Name() + ".decode: type assertion failed")
-			}
-			s, ok := val["last"].(string)
-			if !ok {
-				return errors.New(reflect.TypeOf(b).Name() + ".decode: type assertion failed, missing 'last' (string) field")
-			}
-			price, err := strconv.ParseFloat(s, 64)
-			if err != nil {
-				return err
-			}
-			rate = price
-		}
+	data, ok := dat.(map[string]interface{})
+	if !ok {
+		return errors.New(reflect.TypeOf(b).Name() + ".decode: type assertion failed")
 	}
+	var rate float64
+	v := data["BTC_ETH"]
+	//data := dat.(map[string]interface{})
+	//var rate float64
+
+	val, ok := v.(map[string]interface{})
+	if !ok {
+		return errors.New(reflect.TypeOf(b).Name() + ".decode: type assertion failed")
+	}
+	s, ok := val["last"].(string)
+	if !ok {
+		return errors.New(reflect.TypeOf(b).Name() + ".decode: type assertion failed, missing 'last' (string) field")
+	}
+	price, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return err
+	}
+	rate = price
+
 	if rate == 0 {
 		return errors.New("bitcoin-ethereum price data not available")
 	}
