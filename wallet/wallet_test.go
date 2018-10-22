@@ -1,8 +1,8 @@
 package wallet
 
 import (
-	"bytes"
-	"context"
+	"crypto/rand"
+	"encoding/binary"
 	"fmt"
 	"math/big"
 	"net/url"
@@ -11,13 +11,14 @@ import (
 
 	"github.com/OpenBazaar/multiwallet/config"
 	wi "github.com/OpenBazaar/wallet-interface"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	hd "github.com/btcsuite/btcutil/hdkeychain"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/sha3"
-	"github.com/rs/xid"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/OpenBazaar/go-ethwallet/util"
@@ -46,11 +47,23 @@ func setupDestWallet() {
 
 func setupEthRedeemScript(timeout time.Duration, threshold int) {
 
-	script.TxnID = common.HexToAddress(xid.New().String() + xid.New().String())
+	chaincode := make([]byte, 32)
+	_, err := rand.Read(chaincode)
+	fmt.Println("chiancode : ", chaincode)
+	if err != nil {
+		fmt.Println(err)
+		chaincode = []byte("423b5d4c32345ced77393b3530b1eed1")
+	}
+	//chaincode := []byte("423b5d4c32345ced77393b3530b1eed1")
+	script.TxnID = common.BytesToAddress(chaincode) // .HexToAddress(string(chaincode)) // common.HexToAddress(xid.New().String() + xid.New().String())
 	script.Timeout = uint32(timeout.Hours())
 	script.Threshold = uint8(threshold)
-	script.Buyer = common.HexToAddress(validSourceAddress)
+	script.Buyer = common.HexToAddress(mnemonicStrAddress)
 	script.Seller = common.HexToAddress(validDestinationAddress)
+	script.Moderator = common.BigToAddress(big.NewInt(0))
+
+	//fmt.Println("in setup script: ")
+	//spew.Dump(script)
 }
 
 func setupCoinConfigRopsten() {
@@ -66,7 +79,7 @@ func setupCoinConfigRinkeby() {
 	cfg.ClientAPI = *clientURL
 	cfg.CoinType = wi.Ethereum
 	cfg.Options = make(map[string]interface{})
-	cfg.Options["RegistryAddress"] = "0xab8dd0e05b73529b440d9c9df00b5f490c8596ff"
+	cfg.Options["RegistryAddress"] = "0x403d907982474cdd51687b09a8968346159378f3" //"0xab8dd0e05b73529b440d9c9df00b5f490c8596ff"
 }
 
 func TestNewWalletWithValidKeyfileValues(t *testing.T) {
@@ -242,64 +255,259 @@ func TestWalletContractAddTransaction(t *testing.T) {
 		t.Error("error serializing redeem script")
 	}
 
-	hash := sha3.NewKeccak256()
-	hash.Write(redeemScript)
-	hashStr := hexutil.Encode(hash.Sum(nil)[:])
-	shash1 := crypto.Keccak256(redeemScript)
-	shash1Str := hexutil.Encode(shash1)
-	fmt.Println("hashStr : ", hashStr)
-	fmt.Println("shash1Str : ", shash1Str)
-	addr := common.HexToAddress(hashStr)
-	var shash [32]byte
-	copy(shash[:], addr.Bytes())
+	fmt.Println(redeemScript)
 
-	var s1 [32]byte
-	var s2 [32]byte
+	/*
 
-	copy(s1[:], hash.Sum(nil)[:])
-	copy(s2[:], shash1)
+		hash := sha3.NewKeccak256()
+		hash.Write(redeemScript)
+		hashStr := hexutil.Encode(hash.Sum(nil)[:])
+		shash1 := crypto.Keccak256(redeemScript)
+		shash1Str := hexutil.Encode(shash1)
+		fmt.Println("hashStr : ", hashStr)
+		fmt.Println("shash1Str : ", shash1Str)
+		addr := common.HexToAddress(hashStr)
+		var shash [32]byte
+		copy(shash[:], addr.Bytes())
 
-	fmt.Println("s1 and s2 are equal? : ", bytes.Equal(s1[:], s2[:]))
+		var s1 [32]byte
+		var s2 [32]byte
 
-	fromAddress := validSampleWallet.account.Address()
-	nonce, err := validSampleWallet.client.PendingNonceAt(context.Background(), fromAddress)
-	if err != nil {
-		log.Fatal(err)
+		copy(s1[:], hash.Sum(nil)[:])
+		copy(s2[:], shash1)
+
+		fmt.Println("s1 and s2 are equal? : ", bytes.Equal(s1[:], s2[:]))
+
+		fromAddress := validSampleWallet.account.Address()
+		nonce, err := validSampleWallet.client.PendingNonceAt(context.Background(), fromAddress)
+		if err != nil {
+			log.Fatal(err)
+		}
+		gasPrice, err := validSampleWallet.client.SuggestGasPrice(context.Background())
+		if err != nil {
+			log.Fatal(err)
+		}
+		auth := bind.NewKeyedTransactor(validSampleWallet.account.privateKey)
+
+		auth.Nonce = big.NewInt(int64(nonce))
+		auth.Value = big.NewInt(66778899) // in wei
+		auth.GasLimit = 4000000           // in units
+		auth.GasPrice = gasPrice
+
+		fmt.Println("buyer : ", script.Buyer)
+		fmt.Println("seller : ", script.Seller)
+		fmt.Println("moderator : ", script.Moderator)
+		fmt.Println("threshold : ", script.Threshold)
+		fmt.Println("timeout : ", script.Timeout)
+		fmt.Println("scrptHash : ", shash)
+
+		smtct, err := NewEscrow(ver.Implementation, validSampleWallet.client)
+		if err != nil {
+			t.Errorf("error initilaizing contract failed: %s", err.Error())
+		}
+
+		var tx *types.Transaction
+
+		if script.Threshold == 1 {
+			tx, err = smtct.AddTransaction(auth, script.Buyer, script.Seller,
+				common.BigToAddress(big.NewInt(0)), script.Threshold, script.Timeout, shash, script.TxnID)
+		} else {
+			tx, err = smtct.AddTransaction(auth, script.Buyer, script.Seller,
+				script.Moderator, script.Threshold, script.Timeout, shash, script.TxnID)
+		}
+
+		fmt.Println(tx)
+		fmt.Println(err)
+
+	*/
+
+	spew.Dump(script)
+
+	orderValue := big.NewInt(34567812347878)
+
+	hash, err := validSampleWallet.callAddTransaction(script, orderValue)
+
+	fmt.Println("returned hash : ", hash)
+	fmt.Println(err)
+
+	chash, err := chainhash.NewHashFromStr(hash.String())
+
+	fmt.Println("err : ", err)
+
+	if err == nil {
+		txn, err := validSampleWallet.GetTransaction(*chash)
+
+		spew.Dump(txn)
+		fmt.Println(err)
 	}
-	gasPrice, err := validSampleWallet.client.SuggestGasPrice(context.Background())
+
+	hkey := hd.NewExtendedKey([]byte{}, []byte{}, []byte{}, []byte{}, 0, 0, false)
+
+	sig, err := validSampleWallet.CreateMultisigSignature([]wi.TransactionInput{}, []wi.TransactionOutput{},
+		hkey, redeemScript, 2000)
+
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
 	}
-	auth := bind.NewKeyedTransactor(validSampleWallet.account.privateKey)
 
-	auth.Nonce = big.NewInt(int64(nonce))
-	auth.Value = big.NewInt(66778899) // in wei
-	auth.GasLimit = 4000000           // in units
-	auth.GasPrice = gasPrice
+	fmt.Println(sig)
 
-	fmt.Println("buyer : ", script.Buyer)
-	fmt.Println("seller : ", script.Seller)
-	fmt.Println("moderator : ", script.Moderator)
-	fmt.Println("threshold : ", script.Threshold)
-	fmt.Println("timeout : ", script.Timeout)
-	fmt.Println("scrptHash : ", shash)
+	output := wi.TransactionOutput{
+		Address: EthAddress{&script.Seller},
+		Value:   orderValue.Int64(),
+		Index:   1,
+	}
+
+	time.Sleep(5 * time.Minute)
+
+	txBytes, err := validSampleWallet.Multisign([]wi.TransactionInput{},
+		[]wi.TransactionOutput{output},
+		sig, []wi.Signature{wi.Signature{InputIndex: 1, Signature: []byte{}}}, redeemScript,
+		20000, true)
+	fmt.Println("after multisign")
+	fmt.Println(txBytes)
+	fmt.Println("err : ", err)
+
+	mtx := &types.Transaction{}
+
+	mtx.UnmarshalJSON(txBytes)
+
+	spew.Dump(mtx)
+
+	sshh, sshhstr, _ := GenScriptHash(script)
+
+	fmt.Println("script hash for ct : ", sshh)
+	fmt.Println(sshhstr)
+
+}
+
+func TestWalletContractScriptHash(t *testing.T) {
+	setupSourceWallet()
+
+	ver, err := validSampleWallet.registry.GetRecommendedVersion(nil, "escrow")
+	if err != nil {
+		t.Error("error fetching escrow from registry")
+	}
+
+	if util.IsZeroAddress(ver.Implementation) {
+		log.Infof("escrow not available")
+		return
+	}
+
+	d, _ := time.ParseDuration("1h")
+	setupEthRedeemScript(d, 1)
+
+	chaincode := []byte("423b5d4c32345ced77393b3530b1eed1")
+
+	script.TxnID = common.BytesToAddress(chaincode)
+
+	script.MultisigAddress = ver.Implementation
+
+	/*
+		fmt.Println("buyer : ", script.Buyer)
+		fmt.Println("seller : ", script.Seller)
+		fmt.Println("moderator : ", script.Moderator)
+		fmt.Println("threshold : ", script.Threshold)
+		fmt.Println("timeout : ", script.Timeout)
+		fmt.Println("scrptHash : ", shash)
+	*/
+
+	spew.Dump(script)
 
 	smtct, err := NewEscrow(ver.Implementation, validSampleWallet.client)
 	if err != nil {
 		t.Errorf("error initilaizing contract failed: %s", err.Error())
 	}
 
-	var tx *types.Transaction
+	retHash, err := smtct.CalculateRedeemScriptHash(nil, script.TxnID, script.Threshold, script.Timeout, script.Buyer,
+		script.Seller, script.Moderator, script.TokenAddress)
 
-	if script.Threshold == 1 {
-		tx, err = smtct.AddTransaction(auth, script.Buyer, script.Seller,
-			[]common.Address{}, script.Threshold, script.Timeout, shash)
-	} else {
-		tx, err = smtct.AddTransaction(auth, script.Buyer, script.Seller,
-			[]common.Address{script.Moderator}, script.Threshold, script.Timeout, shash)
+	fmt.Println(err)
+	fmt.Println("from smtct : ", retHash)
+
+	rethash1Str := hexutil.Encode(retHash[:])
+	fmt.Println("rethash1Str : ", rethash1Str)
+
+	ahash := sha3.NewKeccak256()
+	a := make([]byte, 4)
+	binary.BigEndian.PutUint32(a, script.Timeout)
+	arr := append(script.TxnID.Bytes(), append([]byte{script.Threshold},
+		append(a[:], append(script.Buyer.Bytes(),
+			append(script.Seller.Bytes(), append(script.Moderator.Bytes(),
+				append(script.MultisigAddress.Bytes())...)...)...)...)...)...)
+	ahash.Write(arr)
+	ahashStr := hexutil.Encode(ahash.Sum(nil)[:])
+
+	fmt.Println("computed : ", ahashStr)
+
+	fmt.Println("priv key : ", validSampleWallet.account.privateKey)
+
+	b := []byte{161, 162, 209, 139, 227, 101, 186, 196, 93, 247, 64, 186, 79, 166, 235, 225, 191, 123, 139, 89, 247, 48, 49, 71, 46, 130, 125, 221, 137, 35, 41, 51}
+
+	fmt.Println(hexutil.Encode(b))
+
+	privateKeyBytes := crypto.FromECDSA(validSampleWallet.account.privateKey)
+	fmt.Println(hexutil.Encode(privateKeyBytes)[2:])
+
+	fmt.Println("dest : ", script.MultisigAddress.String()[2:])
+	fmt.Println("dest : ", string(script.MultisigAddress.Bytes()))
+	fmt.Println("dest : ", script.MultisigAddress.Hex())
+	fmt.Println("dest : ", []byte(script.MultisigAddress.String())[2:])
+
+	a1, b1, c1 := GenScriptHash(script)
+	fmt.Println("scrpt hash : ", a1, "   ", b1[2:], "    ", c1)
+}
+
+func TestWalletContractTxnHash(t *testing.T) {
+	t.Parallel()
+
+	orderValue := big.NewInt(34567812347878)
+	destStr := fmt.Sprintf("%064s", validDestinationAddress[2:])
+	amountStr := fmt.Sprintf("%064s", fmt.Sprintf("%x", orderValue.Int64()))
+
+	fmt.Println("dest str : ", destStr)
+	fmt.Println("amnt str : ", amountStr)
+
+	setupSourceWallet()
+
+	d, _ := time.ParseDuration("1h")
+	setupEthRedeemScript(d, 1)
+
+	a1, b1, c1 := GenScriptHash(script)
+	fmt.Println("scrpt hash : ", a1, "   ", b1[2:], "    ", c1)
+
+	b1 = "0x66cfea37109f1240d9d2f88643be076dc757883113a00a65ae8cd53d1e8411b4"
+
+	payloadStr := string('\x19') + "00" + script.MultisigAddress.String()[2:] + destStr + amountStr +
+		b1[2:]
+
+	fmt.Println("payload str : ", payloadStr)
+
+	pHash := crypto.Keccak256([]byte(payloadStr))
+	var payloadHash [32]byte
+	copy(payloadHash[:], pHash)
+
+	fmt.Println("payloadHash : ", hexutil.Encode(pHash))
+
+	txData := []byte("\u0019Ethereum Signed Message:\n32")
+	//txData = append(txData, byte(32))
+	txData = append(txData, []byte(hexutil.Encode(pHash))...)
+	txnHash := crypto.Keccak256(txData)
+	fmt.Println("txnHash : ", hexutil.Encode(txnHash))
+	var txHash [32]byte
+	copy(txHash[:], txnHash)
+
+	sig, err := crypto.Sign(txHash[:], validSampleWallet.account.privateKey)
+	if err != nil {
+		log.Errorf("error signing in createmultisig : %v", err)
 	}
 
-	fmt.Println(tx)
-	fmt.Println(err)
+	spew.Dump(sig)
+
+	r, s, v := util.SigRSV(sig)
+
+	fmt.Println("r  : ", hexutil.Encode(r[:]))
+	fmt.Println("s  : ", hexutil.Encode(s[:]))
+	fmt.Println("v  : ", v)
 
 }

@@ -1,9 +1,11 @@
 package util
 
 import (
+	"fmt"
 	"math/big"
 	"testing"
 
+	"github.com/btcsuite/btcutil/hdkeychain"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/shopspring/decimal"
@@ -133,4 +135,29 @@ func TestSigRSV(t *testing.T) {
 	if v != expectedV {
 		t.FailNow()
 	}
+}
+
+func TestExtractChaincode(t *testing.T) {
+	t.Parallel()
+
+	version := []byte{0x05, 0x06, 0x07, 0x08}
+	validAddress := []byte("323b5d4c32345ced77393b3530b1eed0f346429d")
+	chaincode := []byte("423b5d4c32345ced77393b3530b1eed1")
+	parentFP := []byte{0x00, 0x00, 0x00, 0x00}
+
+	fmt.Println(version, validAddress, chaincode)
+
+	key := hdkeychain.NewExtendedKey(version, validAddress, chaincode[:32], parentFP, 0, 0, false)
+
+	actualChaincode := ExtractChaincode(key)
+
+	fmt.Println(actualChaincode)
+
+	fmt.Println("Org Chaincode : ", string(chaincode[:32]))
+	fmt.Println("Extracted Chaincode : ", string(actualChaincode))
+
+	if string(chaincode[:32]) != string(actualChaincode) {
+		t.Error("chaincodes dont match")
+	}
+
 }
