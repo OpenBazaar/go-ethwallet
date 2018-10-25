@@ -600,35 +600,48 @@ func (wallet *EthereumWallet) CreateMultisigSignature(ins []wi.TransactionInput,
 	//amounts := []*big.Int{}
 
 	destArr := []byte{}
-	destStr := ""
+	//destStr := ""
 	amountArr := []byte{}
-	amountStr := ""
+	//amountStr := ""
+
+	//spew.Dump(payables)
 
 	for k, v := range payables {
 		addr := common.HexToAddress(k)
+		sample := [32]byte{}
+		sampleDest := [32]byte{}
+		copy(sampleDest[12:], addr.Bytes())
+		a := make([]byte, 8)
+		binary.BigEndian.PutUint64(a, v.Uint64())
+
+		copy(sample[24:], a)
 		//destinations = append(destinations, addr)
 		//amounts = append(amounts, v)
-		addrStr := fmt.Sprintf("%064s", addr.String())
-		destStr = destStr + addrStr
-		destArr = append(destArr, []byte(addrStr)...)
-		amountArr = append(amountArr, v.Bytes()...)
-		amnt := fmt.Sprintf("%064s", fmt.Sprintf("%x", v.Int64()))
-		amountStr = amountStr + amnt
+		//addrStr := fmt.Sprintf("%064s", addr.String())
+		//destStr = destStr + addrStr
+		destArr = append(destArr, sampleDest[:]...)
+		amountArr = append(amountArr, sample[:]...)
+		//amnt := fmt.Sprintf("%064s", fmt.Sprintf("%x", v.Int64()))
+		//amountStr = amountStr + amnt
 	}
+
+	//fmt.Println("destarr     : ", destArr)
+	//fmt.Println("amountArr   : ", amountArr)
 
 	rScript, err := DeserializeEthScript(redeemScript)
 	if err != nil {
 		return nil, err
 	}
 
-	shash, hashStr, err := GenScriptHash(rScript)
+	//spew.Dump(rScript)
+
+	shash, _, err := GenScriptHash(rScript)
 	if err != nil {
 		return nil, err
 	}
 
 	var txHash [32]byte
 	var payloadHash [32]byte
-	payload := []byte{}
 
 	/*
 				// Follows ERC191 signature scheme: https://github.com/ethereum/EIPs/issues/191
@@ -650,8 +663,7 @@ func (wallet *EthereumWallet) CreateMultisigSignature(ins []wi.TransactionInput,
 
 	*/
 
-	payload = append(payload, '\x19')
-	payload = append(payload, byte(0))
+	payload := []byte{byte(0x19), byte(0)}
 	payload = append(payload, rScript.MultisigAddress.Bytes()...)
 	payload = append(payload, destArr...)
 	payload = append(payload, amountArr...)
@@ -659,17 +671,21 @@ func (wallet *EthereumWallet) CreateMultisigSignature(ins []wi.TransactionInput,
 
 	//script.MultisigAddress.String()[2:]
 
-	payloadStr := "0x19" + "00" + rScript.MultisigAddress.String()[2:] + destStr + amountStr +
-		hashStr[2:]
+	//payloadStr := "0x19" + "00" + rScript.MultisigAddress.String()[2:] + destStr + amountStr +
+	//	hashStr[2:]
+	//payloadStr = payloadStr + ""
 
-	pHash := crypto.Keccak256([]byte(payloadStr))
+	//pHash := crypto.Keccak256([]byte(payloadStr))
+	pHash := crypto.Keccak256(payload)
 	copy(payloadHash[:], pHash)
 
-	txData := []byte("\x19Ethereum Signed Message:\n32")
+	txData := []byte{byte(0x19)}
+	txData = append(txData, []byte("Ethereum Signed Message:\n32")...)
 	//txData = append(txData, byte(32))
 	txData = append(txData, payloadHash[:]...)
 	txnHash := crypto.Keccak256(txData)
-	fmt.Println("txnHash : ", hexutil.Encode(txnHash))
+	//fmt.Println("txnHash        : ", hexutil.Encode(txnHash))
+	//fmt.Println("phash          : ", hexutil.Encode(payloadHash[:]))
 	copy(txHash[:], txnHash)
 
 	sig, err := crypto.Sign(txHash[:], wallet.account.privateKey)
@@ -770,8 +786,8 @@ func (wallet *EthereumWallet) Multisign(ins []wi.TransactionInput, outs []wi.Tra
 
 	tx, err = smtct.Execute(auth, vSlice, rSlice, sSlice, shash, destinations, amounts)
 
-	fmt.Println(tx)
-	fmt.Println(err)
+	//fmt.Println(tx)
+	//fmt.Println(err)
 
 	if err != nil {
 		return nil, err

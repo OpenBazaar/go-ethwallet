@@ -22,7 +22,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/sha3"
-	"github.com/rs/xid"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/proxy"
 
@@ -49,7 +48,7 @@ type ERC20Wallet struct {
 
 // GenTokenScriptHash - used to generate script hash for erc20 token as per
 // escrow smart contract
-func GenTokenScriptHash(script EthRedeemScript) ([]byte, string, error) {
+func GenTokenScriptHash(script EthRedeemScript) ([32]byte, string, error) {
 	ahash := sha3.NewKeccak256()
 	a := make([]byte, 4)
 	binary.BigEndian.PutUint32(a, script.Timeout)
@@ -59,10 +58,12 @@ func GenTokenScriptHash(script EthRedeemScript) ([]byte, string, error) {
 				append(script.MultisigAddress.Bytes(),
 					script.TokenAddress.Bytes()...)...)...)...)...)...)...)
 	ahash.Write(arr)
-	rethash := ahash.Sum(nil)[:]
-	ahashStr := hexutil.Encode(rethash)
+	var retHash [32]byte
 
-	return rethash, ahashStr, nil
+	copy(retHash[:], ahash.Sum(nil)[:])
+	ahashStr := hexutil.Encode(retHash[:])
+
+	return retHash, ahashStr, nil
 }
 
 // TokenDetail is used to capture ERC20 token details
@@ -315,8 +316,37 @@ func (wallet *ERC20Wallet) GetFeePerByte(feeLevel wi.FeeLevel) uint64 {
 
 // Spend - Send ether to an external wallet
 func (wallet *ERC20Wallet) Spend(amount int64, addr btcutil.Address, feeLevel wi.FeeLevel) (*chainhash.Hash, error) {
-	hash, err := wallet.Transfer(addr.String(), big.NewInt(amount))
+	var hash common.Hash
 	var h *chainhash.Hash
+	var err error
+
+	// check if the addr is a multisig addr
+	scripts, err := wallet.db.WatchedScripts().GetAll()
+	if err != nil {
+		return nil, err
+	}
+	isScript := false
+	key := []byte(addr.String())
+	redeemScript := []byte{}
+
+	for _, script := range scripts {
+		if bytes.Equal(key, script[:common.AddressLength]) {
+			isScript = true
+			redeemScript = script[common.AddressLength:]
+			break
+		}
+	}
+
+	if isScript {
+		ethScript, err := DeserializeEthScript(redeemScript)
+		if err != nil {
+			return nil, err
+		}
+		hash, err = wallet.callAddTokenTransaction(ethScript, big.NewInt(amount))
+	} else {
+		hash, err = wallet.Transfer(addr.String(), big.NewInt(amount))
+	}
+
 	if err == nil {
 		h, err = chainhash.NewHashFromStr(hash.String())
 	}
@@ -353,23 +383,9 @@ func (wallet *ERC20Wallet) SweepAddress(utxos []wi.TransactionInput, address *bt
 	return chainhash.NewHashFromStr("")
 }
 
-// GenerateMultisigScript - Generate a multisig script from public keys. If a timeout is included the returned script should be a timelocked escrow which releases using the timeoutKey.
-func (wallet *ERC20Wallet) GenerateMultisigScript(keys []hd.ExtendedKey, threshold int, timeout time.Duration, timeoutKey *hd.ExtendedKey) (btcutil.Address, []byte, error) {
-	if uint32(timeout.Hours()) > 0 && timeoutKey == nil {
-		return nil, nil, errors.New("timeout key must be non nil when using an escrow timeout")
-	}
+func (wallet *ERC20Wallet) callAddTokenTransaction(script EthRedeemScript, value *big.Int) (common.Hash, error) {
 
-	if len(keys) < threshold {
-		return nil, nil, fmt.Errorf("unable to generate multisig script with "+
-			"%d required signatures when there are only %d public "+
-			"keys available", threshold, len(keys))
-	}
-
-	if len(keys) < 2 {
-		return nil, nil, fmt.Errorf("unable to generate multisig script with "+
-			"%d required signatures when there are only %d public "+
-			"keys available", threshold, len(keys))
-	}
+	h := common.BigToHash(big.NewInt(0))
 
 	// call registry to get the deployed address for the escrow ct
 	fromAddress := wallet.account.Address()
@@ -388,21 +404,58 @@ func (wallet *ERC20Wallet) GenerateMultisigScript(keys []hd.ExtendedKey, thresho
 	auth.GasLimit = 4000000    // in units
 	auth.GasPrice = gasPrice
 
-	ver, err := wallet.registry.GetRecommendedVersion(nil, "escrow")
+	shash, _, err := GenTokenScriptHash(script)
 	if err != nil {
-		log.Fatal(err)
+		return h, err
 	}
 
-	if util.IsZeroAddress(ver.Implementation) {
-		return nil, nil, errors.New("no escrow contract available")
-	}
-
-	smtct, err := NewEscrow(ver.Implementation, wallet.client)
+	smtct, err := NewEscrow(script.MultisigAddress, wallet.client)
 	if err != nil {
 		log.Fatalf("error initilaizing contract failed: %s", err.Error())
 	}
 
-	wallet.token.Approve(nil, ver.Implementation, big.NewInt(0))
+	var tx *types.Transaction
+
+	tx, err = wallet.token.Approve(auth, script.MultisigAddress, value)
+
+	if err != nil {
+		return common.BigToHash(big.NewInt(0)), err
+	}
+
+	auth.Nonce = big.NewInt(int64(nonce))
+	auth.Value = value      // in wei
+	auth.GasLimit = 4000000 // in units
+	auth.GasPrice = gasPrice
+
+	tx, err = smtct.AddTokenTransaction(auth, script.Buyer, script.Seller,
+		script.Moderator, script.Threshold, script.Timeout, shash,
+		value, script.TxnID, wallet.deployAddressMain)
+
+	if err == nil {
+		h = tx.Hash()
+	}
+
+	return h, err
+
+}
+
+// GenerateMultisigScript - Generate a multisig script from public keys. If a timeout is included the returned script should be a timelocked escrow which releases using the timeoutKey.
+func (wallet *ERC20Wallet) GenerateMultisigScript(keys []hd.ExtendedKey, threshold int, timeout time.Duration, timeoutKey *hd.ExtendedKey) (btcutil.Address, []byte, error) {
+	if uint32(timeout.Hours()) > 0 && timeoutKey == nil {
+		return nil, nil, errors.New("timeout key must be non nil when using an escrow timeout")
+	}
+
+	if len(keys) < threshold {
+		return nil, nil, fmt.Errorf("unable to generate multisig script with "+
+			"%d required signatures when there are only %d public "+
+			"keys available", threshold, len(keys))
+	}
+
+	if len(keys) < 2 {
+		return nil, nil, fmt.Errorf("unable to generate multisig script with "+
+			"%d required signatures when there are only %d public "+
+			"keys available", threshold, len(keys))
+	}
 
 	var ecKeys []common.Address
 	for _, key := range keys {
@@ -413,14 +466,24 @@ func (wallet *ERC20Wallet) GenerateMultisigScript(keys []hd.ExtendedKey, thresho
 		ecKeys = append(ecKeys, common.BytesToAddress(ecKey.SerializeUncompressed()))
 	}
 
+	ver, err := wallet.registry.GetRecommendedVersion(nil, "escrow")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if util.IsZeroAddress(ver.Implementation) {
+		return nil, nil, errors.New("no escrow contract available")
+	}
+
 	builder := EthRedeemScript{}
 
-	builder.TxnID = common.HexToAddress(xid.New().String() + xid.New().String())
+	builder.TxnID = common.BytesToAddress(util.ExtractChaincode(&keys[0]))
 	builder.Timeout = uint32(timeout.Hours())
 	builder.Threshold = uint8(threshold)
 	builder.Buyer = ecKeys[0]
 	builder.Seller = ecKeys[1]
 	builder.MultisigAddress = ver.Implementation
+	builder.TokenAddress = wallet.deployAddressMain
 
 	if threshold > 1 {
 		builder.Moderator = ecKeys[2]
@@ -449,23 +512,9 @@ func (wallet *ERC20Wallet) GenerateMultisigScript(keys []hd.ExtendedKey, thresho
 	hash.Write(redeemScript)
 	addr := common.HexToAddress(hexutil.Encode(hash.Sum(nil)[:]))
 	retAddr := EthAddress{&addr}
-	var shash [32]byte
-	copy(shash[:], hash.Sum(nil)[:])
 
-	var tx *types.Transaction
-
-	if builder.Threshold == 1 {
-		tx, err = smtct.AddTransaction(auth, builder.Buyer, builder.Seller,
-			common.BigToAddress(big.NewInt(0)), builder.Threshold,
-			builder.Timeout, shash, builder.TxnID)
-	} else {
-		tx, err = smtct.AddTransaction(auth, builder.Buyer, builder.Seller,
-			builder.Moderator, builder.Threshold,
-			builder.Timeout, shash, builder.TxnID)
-	}
-
-	fmt.Println(tx)
-	fmt.Println(err)
+	scriptKey := append(addr.Bytes(), redeemScript...)
+	wallet.db.WatchedScripts().Put(scriptKey)
 
 	return retAddr, redeemScript, nil
 }
@@ -474,9 +523,87 @@ func (wallet *ERC20Wallet) GenerateMultisigScript(keys []hd.ExtendedKey, thresho
 func (wallet *ERC20Wallet) CreateMultisigSignature(ins []wi.TransactionInput, outs []wi.TransactionOutput, key *hd.ExtendedKey, redeemScript []byte, feePerByte uint64) ([]wi.Signature, error) {
 
 	var sigs []wi.Signature
-	shash := crypto.Keccak256(redeemScript)
 
-	sig, err := crypto.Sign(shash, wallet.account.privateKey)
+	payables := make(map[string]*big.Int)
+	for _, out := range outs {
+		if out.Value <= 0 {
+			continue
+		}
+		val := big.NewInt(out.Value)
+		if p, ok := payables[out.Address.String()]; ok {
+			sum := big.NewInt(0)
+			sum.Add(val, p)
+			payables[out.Address.String()] = sum
+		} else {
+			payables[out.Address.String()] = val
+		}
+	}
+
+	destArr := []byte{}
+	amountArr := []byte{}
+
+	for k, v := range payables {
+		addr := common.HexToAddress(k)
+		sample := [32]byte{}
+		sampleDest := [32]byte{}
+		copy(sampleDest[12:], addr.Bytes())
+		a := make([]byte, 8)
+		binary.BigEndian.PutUint64(a, v.Uint64())
+
+		copy(sample[24:], a)
+		destArr = append(destArr, sampleDest[:]...)
+		amountArr = append(amountArr, sample[:]...)
+	}
+
+	rScript, err := DeserializeEthScript(redeemScript)
+	if err != nil {
+		return nil, err
+	}
+
+	shash, _, err := GenTokenScriptHash(rScript)
+	if err != nil {
+		return nil, err
+	}
+
+	var txHash [32]byte
+	var payloadHash [32]byte
+
+	/*
+				// Follows ERC191 signature scheme: https://github.com/ethereum/EIPs/issues/191
+		        bytes32 txHash = keccak256(
+		            abi.encodePacked(
+		                "\x19Ethereum Signed Message:\n32",
+		                keccak256(
+		                    abi.encodePacked(
+		                        byte(0x19),
+		                        byte(0),
+		                        this,
+		                        destinations,
+		                        amounts,
+		                        scriptHash
+		                    )
+		                )
+		            )
+		        );
+
+	*/
+
+	payload := []byte{byte(0x19), byte(0)}
+	payload = append(payload, rScript.MultisigAddress.Bytes()...)
+	payload = append(payload, destArr...)
+	payload = append(payload, amountArr...)
+	payload = append(payload, shash[:]...)
+
+	pHash := crypto.Keccak256(payload)
+	copy(payloadHash[:], pHash)
+
+	txData := []byte{byte(0x19)}
+	txData = append(txData, []byte("Ethereum Signed Message:\n32")...)
+	txData = append(txData, payloadHash[:]...)
+	txnHash := crypto.Keccak256(txData)
+	copy(txHash[:], txnHash)
+
+	sig, err := crypto.Sign(txHash[:], wallet.account.privateKey)
 	if err != nil {
 		log.Errorf("error signing in createmultisig : %v", err)
 	}
@@ -488,10 +615,13 @@ func (wallet *ERC20Wallet) CreateMultisigSignature(ins []wi.TransactionInput, ou
 // Multisign - Combine signatures and optionally broadcast
 func (wallet *ERC20Wallet) Multisign(ins []wi.TransactionInput, outs []wi.TransactionOutput, sigs1 []wi.Signature, sigs2 []wi.Signature, redeemScript []byte, feePerByte uint64, broadcast bool) ([]byte, error) {
 
-	var buf bytes.Buffer
+	//var buf bytes.Buffer
 
 	payables := make(map[string]*big.Int)
 	for _, out := range outs {
+		if out.Value <= 0 {
+			continue
+		}
 		val := big.NewInt(out.Value)
 		if p, ok := payables[out.Address.String()]; ok {
 			sum := big.NewInt(0)
@@ -502,9 +632,9 @@ func (wallet *ERC20Wallet) Multisign(ins []wi.TransactionInput, outs []wi.Transa
 		}
 	}
 
-	rSlice := make([][32]byte, 2)
-	sSlice := make([][32]byte, 2)
-	vSlice := make([]uint8, 2)
+	rSlice := [][32]byte{} //, 2)
+	sSlice := [][32]byte{} //, 2)
+	vSlice := []uint8{}    //, 2)
 
 	r := [32]byte{}
 	s := [32]byte{}
@@ -528,11 +658,12 @@ func (wallet *ERC20Wallet) Multisign(ins []wi.TransactionInput, outs []wi.Transa
 		vSlice = append(vSlice, v)
 	}
 
-	hash := crypto.Keccak256(redeemScript)
-	var shash [32]byte
-	copy(shash[:], hash)
-
 	rScript, err := DeserializeEthScript(redeemScript)
+	if err != nil {
+		return nil, err
+	}
+
+	shash, _, err := GenTokenScriptHash(rScript)
 	if err != nil {
 		return nil, err
 	}
@@ -570,10 +701,16 @@ func (wallet *ERC20Wallet) Multisign(ins []wi.TransactionInput, outs []wi.Transa
 
 	tx, err = smtct.Execute(auth, vSlice, rSlice, sSlice, shash, destinations, amounts)
 
-	fmt.Println(tx)
-	fmt.Println(err)
+	//fmt.Println(tx)
+	//fmt.Println(err)
 
-	return buf.Bytes(), nil
+	if err != nil {
+		return nil, err
+	}
+
+	ret, err := tx.MarshalJSON()
+
+	return ret, err
 }
 
 // AddWatchedAddress - Add a script to the wallet and get notifications back when coins are received or spent from it

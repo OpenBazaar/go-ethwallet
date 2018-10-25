@@ -1,6 +1,7 @@
 package wallet
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
@@ -61,6 +62,7 @@ func setupEthRedeemScript(timeout time.Duration, threshold int) {
 	script.Buyer = common.HexToAddress(mnemonicStrAddress)
 	script.Seller = common.HexToAddress(validDestinationAddress)
 	script.Moderator = common.BigToAddress(big.NewInt(0))
+	script.MultisigAddress = common.HexToAddress("0x36e19e91DFFCA4251f4fB541f5c3a596252eA4BB")
 
 	//fmt.Println("in setup script: ")
 	//spew.Dump(script)
@@ -341,9 +343,15 @@ func TestWalletContractAddTransaction(t *testing.T) {
 		fmt.Println(err)
 	}
 
+	output := wi.TransactionOutput{
+		Address: EthAddress{&script.Seller},
+		Value:   orderValue.Int64(),
+		Index:   1,
+	}
+
 	hkey := hd.NewExtendedKey([]byte{}, []byte{}, []byte{}, []byte{}, 0, 0, false)
 
-	sig, err := validSampleWallet.CreateMultisigSignature([]wi.TransactionInput{}, []wi.TransactionOutput{},
+	sig, err := validSampleWallet.CreateMultisigSignature([]wi.TransactionInput{}, []wi.TransactionOutput{output},
 		hkey, redeemScript, 2000)
 
 	if err != nil {
@@ -352,20 +360,14 @@ func TestWalletContractAddTransaction(t *testing.T) {
 
 	fmt.Println(sig)
 
-	output := wi.TransactionOutput{
-		Address: EthAddress{&script.Seller},
-		Value:   orderValue.Int64(),
-		Index:   1,
-	}
-
 	time.Sleep(5 * time.Minute)
 
 	txBytes, err := validSampleWallet.Multisign([]wi.TransactionInput{},
 		[]wi.TransactionOutput{output},
 		sig, []wi.Signature{wi.Signature{InputIndex: 1, Signature: []byte{}}}, redeemScript,
 		20000, true)
-	fmt.Println("after multisign")
-	fmt.Println(txBytes)
+	//fmt.Println("after multisign")
+	//fmt.Println(txBytes)
 	fmt.Println("err : ", err)
 
 	mtx := &types.Transaction{}
@@ -461,11 +463,30 @@ func TestWalletContractScriptHash(t *testing.T) {
 func TestWalletContractTxnHash(t *testing.T) {
 	t.Parallel()
 
-	orderValue := big.NewInt(34567812347878)
-	destStr := fmt.Sprintf("%064s", validDestinationAddress[2:])
-	amountStr := fmt.Sprintf("%064s", fmt.Sprintf("%x", orderValue.Int64()))
+	val := uint64(34567812347878)
+	//destStr := fmt.Sprintf("%064s", validDestinationAddress[2:])
+	destAddress := common.HexToAddress(validDestinationAddress)
 
-	fmt.Println("dest str : ", destStr)
+	orderValue := big.NewInt(34567812347878)
+	sample := [32]byte{}
+	sampleDest := [32]byte{}
+	atq := make([]byte, 8)
+	binary.BigEndian.PutUint64(atq, orderValue.Uint64())
+	copy(sample[24:], atq)
+
+	fmt.Println("sample   : ", sample)
+	fmt.Println("val      : ", orderValue.Bytes())
+	fmt.Println("val2     : ", atq)
+	fmt.Println("dest     : ", destAddress.Bytes())
+	fmt.Println("len dest : ", len(destAddress.Bytes()))
+	copy(sampleDest[12:], destAddress.Bytes())
+
+	fmt.Println("sdest    : ", sampleDest)
+
+	var amountStr string
+	amountStr = fmt.Sprintf("%064s", fmt.Sprintf("%x", orderValue.Int64()))
+
+	//fmt.Println("dest str : ", destStr)
 	fmt.Println("amnt str : ", amountStr)
 
 	setupSourceWallet()
@@ -473,25 +494,81 @@ func TestWalletContractTxnHash(t *testing.T) {
 	d, _ := time.ParseDuration("1h")
 	setupEthRedeemScript(d, 1)
 
-	a1, b1, c1 := GenScriptHash(script)
-	fmt.Println("scrpt hash : ", a1, "   ", b1[2:], "    ", c1)
+	//a1, b1, c1 := GenScriptHash(script)
+	//fmt.Println("scrpt hash : ", a1, "   ", b1[2:], "    ", c1)
 
-	b1 = "0x66cfea37109f1240d9d2f88643be076dc757883113a00a65ae8cd53d1e8411b4"
+	b1, err := hexutil.Decode("0x66cfea37109f1240d9d2f88643be076dc757883113a00a65ae8cd53d1e8411b4")
 
-	payloadStr := string('\x19') + "00" + script.MultisigAddress.String()[2:] + destStr + amountStr +
-		b1[2:]
+	b2 := byte(0x19)
+	b3 := byte(0)
 
-	fmt.Println("payload str : ", payloadStr)
+	//payloadStr := string(b2) + string(b3) + script.MultisigAddress.String()[2:] + destStr + amountStr +
+	//	b1[2:]
 
-	pHash := crypto.Keccak256([]byte(payloadStr))
+	//trialPayloadStr := "0x190036e19e91dffca4251f4fb541f5c3a596252ea4bb000000000000000000000000cecb952de5b23950b15bfd49302d1bdd25f9ee6700000000000000000000000000000000000000000000000000001f70722cf7e666cfea37109f1240d9d2f88643be076dc757883113a00a65ae8cd53d1e8411b4"
+
+	//fmt.Println("payload str : ", payloadStr)
+	//fmt.Println("trial payload str : ", trialPayloadStr)
+
+	at := make([]byte, 8)
+	binary.BigEndian.PutUint64(at, orderValue.Uint64())
+
+	at1 := make([]byte, 8)
+	binary.LittleEndian.PutUint64(at1, val)
+
+	at2 := make([]byte, 8)
+	binary.BigEndian.PutUint64(at2, val)
+
+	p1 := []byte{b2, b3}
+	p1 = append(p1, script.MultisigAddress.Bytes()...)
+	p1 = append(p1, sampleDest[:]...)
+	p1 = append(p1, sample[:]...)
+	//p1 = append(p1, destAddress.Bytes()...)
+	//p1 = append(p1, orderValue.Bytes()...)
+	//p1 = append(p1, at...)
+	//p1 = append(p1, []byte(amountStr)...)
+	//p1 = append(p1, at1...)
+	//p1 = append(p1, at2...)
+	p1 = append(p1, b1...)
+
+	ahash := sha3.NewKeccak256()
+	//a := make([]byte, 4)
+	//binary.BigEndian.PutUint32(a, script.Timeout)
+	//arr := append(script.TxnID.Bytes(), append([]byte{script.Threshold},
+	//	append(a[:], append(script.Buyer.Bytes(),
+	//		append(script.Seller.Bytes(), append(script.Moderator.Bytes(),
+	//			append(script.MultisigAddress.Bytes())...)...)...)...)...)...)
+
+	p11 := append([]byte{b2}, append([]byte{b3}, append(script.MultisigAddress.Bytes(),
+		append(destAddress.Bytes(), append(orderValue.Bytes(),
+			append(b1)...)...)...)...)...)
+
+	ahash.Write(p11)
+	p11hash := ahash.Sum(nil)[:]
+	fmt.Println("www aaa         : ", hexutil.Encode(p11hash))
+
+	pHash := crypto.Keccak256(p1)
 	var payloadHash [32]byte
 	copy(payloadHash[:], pHash)
 
-	fmt.Println("payloadHash : ", hexutil.Encode(pHash))
+	phash2, err := hexutil.Decode("0x7037f184ba846ff842222df065da84f5de500ad7ba0f996a4c7cdeff3520f4be")
 
-	txData := []byte("\u0019Ethereum Signed Message:\n32")
+	//phash2, err := hexutil.Decode("0x3a0312b6d025a3d21a257ad0a501a75026f9a3180c6d8c4fa2e92f7c12097310")
+
+	if bytes.Equal(phash2, payloadHash[:]) {
+		fmt.Println("yes .... sssssssss .......")
+	} else {
+		fmt.Println("still not there yet ....")
+		fmt.Println("got payloadHash : ", hexutil.Encode(pHash))
+		fmt.Println("wanted          : ", "0x7037f184ba846ff842222df065da84f5de500ad7ba0f996a4c7cdeff3520f4be")
+	}
+
+	//phash2 := []byte("7037f184ba846ff842222df065da84f5de500ad7ba0f996a4c7cdeff3520f4be")
+
+	txData := []byte{byte(0x19)}
+	txData = append(txData, []byte("Ethereum Signed Message:\n32")...)
 	//txData = append(txData, byte(32))
-	txData = append(txData, []byte(hexutil.Encode(pHash))...)
+	txData = append(txData, phash2...)
 	txnHash := crypto.Keccak256(txData)
 	fmt.Println("txnHash : ", hexutil.Encode(txnHash))
 	var txHash [32]byte
