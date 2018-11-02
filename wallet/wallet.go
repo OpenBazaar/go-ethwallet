@@ -439,6 +439,11 @@ func (wallet *EthereumWallet) SweepAddress(utxos []wi.TransactionInput, address 
 	return chainhash.NewHashFromStr("")
 }
 
+// ExchangeRates - return the exchangerates
+func (wallet *EthereumWallet) ExchangeRates() wi.ExchangeRates {
+	return wallet.exchangeRates
+}
+
 func (wallet *EthereumWallet) callAddTransaction(script EthRedeemScript, value *big.Int) (common.Hash, error) {
 
 	h := common.BigToHash(big.NewInt(0))

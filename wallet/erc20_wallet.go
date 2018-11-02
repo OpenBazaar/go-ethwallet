@@ -16,12 +16,15 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcutil"
 	hd "github.com/btcsuite/btcutil/hdkeychain"
+	"github.com/davecgh/go-spew/spew"
+	ethereum "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/sha3"
+	"github.com/ethereum/go-ethereum/ethclient"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/proxy"
 
@@ -383,6 +386,11 @@ func (wallet *ERC20Wallet) SweepAddress(utxos []wi.TransactionInput, address *bt
 	return chainhash.NewHashFromStr("")
 }
 
+// ExchangeRates - return the exchangerates
+func (wallet *ERC20Wallet) ExchangeRates() wi.ExchangeRates {
+	return wallet.exchangeRates
+}
+
 func (wallet *ERC20Wallet) callAddTokenTransaction(script EthRedeemScript, value *big.Int) (common.Hash, error) {
 
 	h := common.BigToHash(big.NewInt(0))
@@ -422,18 +430,68 @@ func (wallet *ERC20Wallet) callAddTokenTransaction(script EthRedeemScript, value
 		return common.BigToHash(big.NewInt(0)), err
 	}
 
-	auth.Nonce = big.NewInt(int64(nonce))
-	auth.Value = value      // in wei
-	auth.GasLimit = 4000000 // in units
-	auth.GasPrice = gasPrice
+	//time.Sleep(2 * time.Minute)
+	header, err := wallet.client.HeaderByNumber(context.Background(), nil)
+	tclient, err := ethclient.Dial("wss://rinkeby.infura.io/ws")
 
-	tx, err = smtct.AddTokenTransaction(auth, script.Buyer, script.Seller,
-		script.Moderator, script.Threshold, script.Timeout, shash,
-		value, script.TxnID, wallet.deployAddressMain)
-
-	if err == nil {
-		h = tx.Hash()
+	query := ethereum.FilterQuery{
+		Addresses: []common.Address{script.TokenAddress},
+		FromBlock: header.Number,
+		Topics:    [][]common.Hash{{common.HexToHash("0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925")}},
 	}
+	logs := make(chan types.Log)
+	sub1, err := tclient.SubscribeFilterLogs(context.Background(), query, logs)
+	if err != nil {
+		return common.BigToHash(big.NewInt(0)), err
+	}
+	defer sub1.Unsubscribe()
+	flag := false
+	for !flag {
+		select {
+		case err := <-sub1.Err():
+			log.Fatal(err)
+		case vLog := <-logs:
+			//fmt.Println(vLog) // pointer to event log
+			//spew.Dump(vLog)
+			//fmt.Println(vLog.Topics[0])
+			fmt.Println(vLog.Address.String())
+			if tx.Hash() == vLog.TxHash {
+				fmt.Println("we have found the approval ...")
+				//time.Sleep(2 * time.Minute)
+				spew.Dump(vLog)
+				nonce, _ = wallet.client.PendingNonceAt(context.Background(), fromAddress)
+				auth.Nonce = big.NewInt(int64(nonce))
+				auth.Value = big.NewInt(0) // in wei
+				auth.GasLimit = 4000000    // in units
+				auth.GasPrice = gasPrice
+
+				tx, err = smtct.AddTokenTransaction(auth, script.Buyer, script.Seller,
+					script.Moderator, script.Threshold, script.Timeout, shash,
+					value, script.TxnID, wallet.deployAddressMain)
+
+				if err == nil {
+					h = tx.Hash()
+				}
+				flag = true
+				break
+			}
+		}
+	}
+
+	/*
+		auth.Nonce = big.NewInt(int64(nonce))
+		auth.Value = value      // in wei
+		auth.GasLimit = 4000000 // in units
+		auth.GasPrice = gasPrice
+
+		tx, err = smtct.AddTokenTransaction(auth, script.Buyer, script.Seller,
+			script.Moderator, script.Threshold, script.Timeout, shash,
+			value, script.TxnID, wallet.deployAddressMain)
+
+		if err == nil {
+			h = tx.Hash()
+		}
+	*/
 
 	return h, err
 

@@ -73,7 +73,8 @@ func setupCoinConfigRopsten() {
 	cfg.ClientAPI = *clientURL
 	cfg.CoinType = wi.Ethereum
 	cfg.Options = make(map[string]interface{})
-	cfg.Options["RegistryAddress"] = "0x029d6a0cd4ce98315690f4ea52945545d9c0f460"
+	//cfg.Options["RegistryAddress"] = "0x029d6a0cd4ce98315690f4ea52945545d9c0f460"
+	cfg.Options["RegistryAddress"] = "0x403d907982474cdd51687b09a8968346159378f3"
 }
 
 func setupCoinConfigRinkeby() {
