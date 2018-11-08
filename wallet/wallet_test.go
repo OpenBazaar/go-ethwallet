@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
@@ -23,6 +24,10 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/OpenBazaar/go-ethwallet/util"
+)
+
+const (
+	magicOrderID = "iamanorderid"
 )
 
 var validRopstenURL = fmt.Sprintf("https://ropsten.infura.io/%s", validInfuraKey)
@@ -85,6 +90,50 @@ func setupCoinConfigRinkeby() {
 	cfg.Options["RegistryAddress"] = "0x403d907982474cdd51687b09a8968346159378f3" //"0xab8dd0e05b73529b440d9c9df00b5f490c8596ff"
 }
 
+type MockWatchedScripts struct {
+	Name string
+}
+
+func (m MockWatchedScripts) Put(script []byte) error {
+	return nil
+}
+
+func (m MockWatchedScripts) GetAll() ([][]byte, error) {
+	return [][]byte{}, nil
+}
+
+func (m MockWatchedScripts) Delete([]byte) error {
+	return nil
+}
+
+type MockDatastore struct {
+	keys           wi.Keys
+	utxos          wi.Utxos
+	stxos          wi.Stxos
+	txns           wi.Txns
+	watchedScripts wi.WatchedScripts
+}
+
+func (m MockDatastore) Keys() wi.Keys {
+	return m.keys
+}
+
+func (m MockDatastore) Utxos() wi.Utxos {
+	return m.utxos
+}
+
+func (m MockDatastore) Stxos() wi.Stxos {
+	return m.stxos
+}
+
+func (m MockDatastore) Txns() wi.Txns {
+	return m.txns
+}
+
+func (m MockDatastore) WatchedScripts() wi.WatchedScripts {
+	return m.watchedScripts
+}
+
 func TestNewWalletWithValidKeyfileValues(t *testing.T) {
 	wallet := NewEthereumWalletWithKeyfile(validRopstenURL, validKeyFile, validPassword)
 	if wallet == nil {
@@ -137,7 +186,7 @@ func TestWalletTransfer(t *testing.T) {
 	setupSourceWallet()
 	setupDestWallet()
 
-	value := big.NewInt(2000000000)
+	value := big.NewInt(99999000000)
 
 	sbal1 := big.NewInt(0)
 	dbal1 := big.NewInt(0)
@@ -151,11 +200,28 @@ func TestWalletTransfer(t *testing.T) {
 	sbal1.Add(cbal1, ucbal1)
 	dbal1.Add(cbal2, ucbal2)
 
-	_, err := validSampleWallet.Transfer(validDestinationAddress, value)
+	h, err := validSampleWallet.Transfer(validDestinationAddress, value)
 
 	if err != nil {
-		t.Errorf("valid wallet should allow transfer")
+		fmt.Println("err in transfer : ", err)
+		return
 	}
+
+	flag := false
+	var rcpt *types.Receipt
+	for !flag {
+		rcpt, err = validSampleWallet.client.TransactionReceipt(context.Background(), h)
+		if rcpt != nil {
+			flag = true
+		}
+	}
+
+	if err != nil {
+		t.Errorf("valid wallet should allow transfer : %v", err)
+	}
+
+	fmt.Println("rcpt")
+	spew.Dump(rcpt)
 
 	//_, err = chainhash.NewHashFromStr(hash.String())
 
@@ -189,7 +255,7 @@ func TestWalletTransfer(t *testing.T) {
 
 	val.Sub(dbal2, dbal1)
 
-	if val.Cmp(value) != 0 {
+	if val.Cmp(value) != 0 && rcpt.Status == 0 {
 		t.Errorf("client should have transferred balance")
 	}
 
@@ -587,5 +653,41 @@ func TestWalletContractTxnHash(t *testing.T) {
 	fmt.Println("r  : ", hexutil.Encode(r[:]))
 	fmt.Println("s  : ", hexutil.Encode(s[:]))
 	fmt.Println("v  : ", v)
+
+}
+
+var listenerCallbackFlag bool
+
+func sampleListener(cb wi.TransactionCallback) {
+	if len(cb.Outputs) > 0 && cb.Outputs[0].OrderID == magicOrderID {
+		listenerCallbackFlag = true
+	}
+}
+
+func TestWalletSpend(t *testing.T) {
+	//t.SkipNow()
+	setupSourceWallet()
+	setupDestWallet()
+
+	value := big.NewInt(99999000000)
+
+	validSampleWallet.AddTransactionListener(sampleListener)
+	validSampleWallet.db = MockDatastore{watchedScripts: MockWatchedScripts{}}
+	listenerCallbackFlag = false
+
+	h, err := validSampleWallet.Spend(value.Int64(), destWallet.address, 1, magicOrderID)
+
+	if err != nil {
+		fmt.Println("err in transfer : ", err)
+		return
+	}
+
+	spew.Dump(h)
+
+	time.Sleep(1 * time.Minute)
+
+	if !listenerCallbackFlag {
+		t.Errorf("spend is not calling back correctly")
+	}
 
 }

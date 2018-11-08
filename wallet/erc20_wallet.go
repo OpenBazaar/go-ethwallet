@@ -47,6 +47,7 @@ type ERC20Wallet struct {
 	deployAddressRopsten common.Address
 	deployAddressRinkeby common.Address
 	token                *Token
+	listeners            []func(wi.TransactionCallback)
 }
 
 // GenTokenScriptHash - used to generate script hash for erc20 token as per
@@ -166,6 +167,7 @@ func NewERC20Wallet(cfg config.CoinConfig, mnemonic string, proxy proxy.Dialer) 
 		deployAddressRopsten: token.deployAddressRopsten,
 		deployAddressRinkeby: token.deployAddressRinkeby,
 		token:                erc20Token,
+		listeners:            []func(wi.TransactionCallback){},
 	}, nil
 }
 
@@ -318,7 +320,7 @@ func (wallet *ERC20Wallet) GetFeePerByte(feeLevel wi.FeeLevel) uint64 {
 }
 
 // Spend - Send ether to an external wallet
-func (wallet *ERC20Wallet) Spend(amount int64, addr btcutil.Address, feeLevel wi.FeeLevel) (*chainhash.Hash, error) {
+func (wallet *ERC20Wallet) Spend(amount int64, addr btcutil.Address, feeLevel wi.FeeLevel, referenceID string) (*chainhash.Hash, error) {
 	var hash common.Hash
 	var h *chainhash.Hash
 	var err error
@@ -350,10 +352,63 @@ func (wallet *ERC20Wallet) Spend(amount int64, addr btcutil.Address, feeLevel wi
 		hash, err = wallet.Transfer(addr.String(), big.NewInt(amount))
 	}
 
+	if err != nil {
+		return nil, err
+	}
+	start := time.Now()
+	flag := false
+	var rcpt *types.Receipt
+	for !flag {
+		rcpt, err = wallet.client.TransactionReceipt(context.Background(), hash)
+		if rcpt != nil {
+			flag = true
+		}
+		if time.Since(start).Seconds() > 120 {
+			flag = true
+		}
+	}
+	if rcpt != nil {
+		// good. so the txn has been processed but we have to account for failed
+		// but valid txn like some contract condition causing revert
+		if rcpt.Status > 0 {
+			// all good to update order state
+			go wallet.callListeners(wallet.createTxnCallback(hash.String(), referenceID, amount, time.Now()))
+		} else {
+			// there was some error processing this txn
+			return nil, errors.New("problem processing this transaction")
+		}
+	}
+
 	if err == nil {
 		h, err = chainhash.NewHashFromStr(hash.String())
 	}
 	return h, err
+}
+
+func (wallet *ERC20Wallet) createTxnCallback(txID, orderID string, value int64, bTime time.Time) wi.TransactionCallback {
+	output := wi.TransactionOutput{
+		Address: wallet.address,
+		Value:   value,
+		Index:   1,
+		OrderID: orderID,
+	}
+
+	return wi.TransactionCallback{
+		Txid:      txID,
+		Outputs:   []wi.TransactionOutput{output},
+		Inputs:    []wi.TransactionInput{},
+		Height:    1,
+		Timestamp: time.Now(),
+		Value:     value,
+		WatchOnly: false,
+		BlockTime: bTime,
+	}
+}
+
+func (wallet *ERC20Wallet) callListeners(txnCB wi.TransactionCallback) {
+	for _, l := range wallet.listeners {
+		go l(txnCB)
+	}
 }
 
 // BumpFee - Bump the fee for the given transaction

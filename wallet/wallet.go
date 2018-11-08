@@ -105,6 +105,7 @@ type EthereumWallet struct {
 	ppsct         *Escrow
 	db            wi.Datastore
 	exchangeRates wi.ExchangeRates
+	listeners     []func(wi.TransactionCallback)
 }
 
 // NewEthereumWalletWithKeyfile will return a reference to the Eth Wallet
@@ -144,7 +145,7 @@ func NewEthereumWalletWithKeyfile(url, keyFile, passwd string) *EthereumWallet {
 	//	log.Fatalf("error initilaizing contract failed: %s", err.Error())
 	//}
 
-	return &EthereumWallet{client, myAccount, &EthAddress{&addr}, &Service{}, reg, nil, nil, nil}
+	return &EthereumWallet{client, myAccount, &EthAddress{&addr}, &Service{}, reg, nil, nil, nil, []func(wi.TransactionCallback){}}
 }
 
 // NewEthereumWallet will return a reference to the Eth Wallet
@@ -219,7 +220,7 @@ func NewEthereumWallet(cfg config.CoinConfig, mnemonic string, proxy proxy.Diale
 
 	er := NewEthereumPriceFetcher(proxy)
 
-	return &EthereumWallet{client, myAccount, &EthAddress{&addr}, &Service{}, reg, nil, cfg.DB, er}, nil
+	return &EthereumWallet{client, myAccount, &EthAddress{&addr}, &Service{}, reg, nil, cfg.DB, er, []func(wi.TransactionCallback){}}, nil
 }
 
 // Params - return nil to comply
@@ -370,11 +371,13 @@ func (wallet *EthereumWallet) GetFeePerByte(feeLevel wi.FeeLevel) uint64 {
 }
 
 // Spend - Send ether to an external wallet
-func (wallet *EthereumWallet) Spend(amount int64, addr btcutil.Address, feeLevel wi.FeeLevel) (*chainhash.Hash, error) {
+func (wallet *EthereumWallet) Spend(amount int64, addr btcutil.Address, feeLevel wi.FeeLevel, referenceID string) (*chainhash.Hash, error) {
 
 	var hash common.Hash
 	var h *chainhash.Hash
 	var err error
+
+	//twoMinutes, _ := time.ParseDuration("2m")
 
 	// check if the addr is a multisig addr
 	scripts, err := wallet.db.WatchedScripts().GetAll()
@@ -403,10 +406,63 @@ func (wallet *EthereumWallet) Spend(amount int64, addr btcutil.Address, feeLevel
 		hash, err = wallet.Transfer(addr.String(), big.NewInt(amount))
 	}
 
+	if err != nil {
+		return nil, err
+	}
+	start := time.Now()
+	flag := false
+	var rcpt *types.Receipt
+	for !flag {
+		rcpt, err = wallet.client.TransactionReceipt(context.Background(), hash)
+		if rcpt != nil {
+			flag = true
+		}
+		if time.Since(start).Seconds() > 120 {
+			flag = true
+		}
+	}
+	if rcpt != nil {
+		// good. so the txn has been processed but we have to account for failed
+		// but valid txn like some contract condition causing revert
+		if rcpt.Status > 0 {
+			// all good to update order state
+			go wallet.callListeners(wallet.createTxnCallback(hash.String(), referenceID, amount, time.Now()))
+		} else {
+			// there was some error processing this txn
+			return nil, errors.New("problem processing this transaction")
+		}
+	}
+
 	if err == nil {
 		h, err = chainhash.NewHashFromStr(hash.String())
 	}
 	return h, err
+}
+
+func (wallet *EthereumWallet) createTxnCallback(txID, orderID string, value int64, bTime time.Time) wi.TransactionCallback {
+	output := wi.TransactionOutput{
+		Address: wallet.address,
+		Value:   value,
+		Index:   1,
+		OrderID: orderID,
+	}
+
+	return wi.TransactionCallback{
+		Txid:      txID,
+		Outputs:   []wi.TransactionOutput{output},
+		Inputs:    []wi.TransactionInput{},
+		Height:    1,
+		Timestamp: time.Now(),
+		Value:     value,
+		WatchOnly: false,
+		BlockTime: bTime,
+	}
+}
+
+func (wallet *EthereumWallet) callListeners(txnCB wi.TransactionCallback) {
+	for _, l := range wallet.listeners {
+		go l(txnCB)
+	}
 }
 
 // BumpFee - Bump the fee for the given transaction
