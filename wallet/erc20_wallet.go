@@ -81,7 +81,7 @@ type TokenDetail struct {
 
 // NewERC20Wallet will return a reference to the ERC20 Wallet
 func NewERC20Wallet(cfg config.CoinConfig, mnemonic string, proxy proxy.Dialer) (*ERC20Wallet, error) {
-	client, err := NewEthClient(cfg.ClientAPI.String() + "/" + InfuraAPIKey)
+	client, err := NewEthClient(cfg.ClientAPIs[0] + "/" + InfuraAPIKey)
 	if err != nil {
 		log.Errorf("error initializing wallet: %v", err)
 		return nil, err

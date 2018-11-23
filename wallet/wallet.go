@@ -76,6 +76,31 @@ func DeserializeEthScript(b []byte) (EthRedeemScript, error) {
 	return scrpt, err
 }
 
+// PendingTxn used to record a pending eth txn
+type PendingTxn struct {
+	TxnID   common.Hash
+	OrderID string
+	Amount  int64
+	Nonce   int32
+}
+
+// SerializePendingTxn - used to serialize eth pending txn
+func SerializePendingTxn(pTxn PendingTxn) ([]byte, error) {
+	b := bytes.Buffer{}
+	e := gob.NewEncoder(&b)
+	err := e.Encode(pTxn)
+	return b.Bytes(), err
+}
+
+// DeserializePendingTxn - used to deserialize eth pending txn
+func DeserializePendingTxn(b []byte) (PendingTxn, error) {
+	pTxn := PendingTxn{}
+	buf := bytes.NewBuffer(b)
+	d := gob.NewDecoder(buf)
+	err := d.Decode(&pTxn)
+	return pTxn, err
+}
+
 // GenScriptHash - used to generate script hash for eth as per
 // escrow smart contract
 func GenScriptHash(script EthRedeemScript) ([32]byte, string, error) {
@@ -150,7 +175,7 @@ func NewEthereumWalletWithKeyfile(url, keyFile, passwd string) *EthereumWallet {
 
 // NewEthereumWallet will return a reference to the Eth Wallet
 func NewEthereumWallet(cfg config.CoinConfig, mnemonic string, proxy proxy.Dialer) (*EthereumWallet, error) {
-	client, err := NewEthClient(cfg.ClientAPI.String() + "/" + InfuraAPIKey)
+	client, err := NewEthClient(cfg.ClientAPIs[0] + "/" + InfuraAPIKey)
 	if err != nil {
 		log.Errorf("error initializing wallet: %v", err)
 		return nil, err
@@ -246,7 +271,21 @@ func (wallet *EthereumWallet) Transfer(to string, value *big.Int) (common.Hash, 
 
 // Start will start the wallet daemon
 func (wallet *EthereumWallet) Start() {
-	// daemonize the wallet
+	// start the ticker to check for pending txn rcpts
+	ticker := time.NewTicker(5 * time.Second)
+	go func() {
+		for range ticker.C {
+			// get the pending txns
+			txns, err := wallet.db.Txns().GetAll(true)
+			if err != nil {
+				continue
+			}
+			for _, txn := range txns {
+				hash := common.HexToHash(txn.Txid)
+				go wallet.CheckTxnRcpt(&hash, txn.Bytes)
+			}
+		}
+	}()
 }
 
 // CurrencyCode returns ETH
@@ -377,59 +416,80 @@ func (wallet *EthereumWallet) Spend(amount int64, addr btcutil.Address, feeLevel
 	var h *chainhash.Hash
 	var err error
 
-	//twoMinutes, _ := time.ParseDuration("2m")
+	if referenceID == "" {
+		// no referenceID means this is a direct transfer
+		hash, err = wallet.Transfer(addr.String(), big.NewInt(amount))
+	} else {
+		// this is a spend which means it has to be linked to an order
+		// specified using the refernceID
 
-	// check if the addr is a multisig addr
-	scripts, err := wallet.db.WatchedScripts().GetAll()
-	if err != nil {
-		return nil, err
-	}
-	isScript := false
-	key := []byte(addr.String())
-	redeemScript := []byte{}
+		//twoMinutes, _ := time.ParseDuration("2m")
 
-	for _, script := range scripts {
-		if bytes.Equal(key, script[:common.AddressLength]) {
-			isScript = true
-			redeemScript = script[common.AddressLength:]
-			break
-		}
-	}
-
-	if isScript {
-		ethScript, err := DeserializeEthScript(redeemScript)
+		// check if the addr is a multisig addr
+		scripts, err := wallet.db.WatchedScripts().GetAll()
 		if err != nil {
 			return nil, err
 		}
-		hash, err = wallet.callAddTransaction(ethScript, big.NewInt(amount))
-	} else {
-		hash, err = wallet.Transfer(addr.String(), big.NewInt(amount))
-	}
+		isScript := false
+		key := []byte(addr.String())
+		redeemScript := []byte{}
 
-	if err != nil {
-		return nil, err
-	}
-	start := time.Now()
-	flag := false
-	var rcpt *types.Receipt
-	for !flag {
-		rcpt, err = wallet.client.TransactionReceipt(context.Background(), hash)
-		if rcpt != nil {
-			flag = true
+		for _, script := range scripts {
+			if bytes.Equal(key, script[:common.AddressLength]) {
+				isScript = true
+				redeemScript = script[common.AddressLength:]
+				break
+			}
 		}
-		if time.Since(start).Seconds() > 120 {
-			flag = true
-		}
-	}
-	if rcpt != nil {
-		// good. so the txn has been processed but we have to account for failed
-		// but valid txn like some contract condition causing revert
-		if rcpt.Status > 0 {
-			// all good to update order state
-			go wallet.callListeners(wallet.createTxnCallback(hash.String(), referenceID, amount, time.Now()))
+
+		if isScript {
+			ethScript, err := DeserializeEthScript(redeemScript)
+			if err != nil {
+				return nil, err
+			}
+			hash, err = wallet.callAddTransaction(ethScript, big.NewInt(amount))
 		} else {
-			// there was some error processing this txn
-			return nil, errors.New("problem processing this transaction")
+			hash, err = wallet.Transfer(addr.String(), big.NewInt(amount))
+		}
+
+		if err != nil {
+			return nil, err
+		}
+		start := time.Now()
+		flag := false
+		var rcpt *types.Receipt
+		for !flag {
+			rcpt, err = wallet.client.TransactionReceipt(context.Background(), hash)
+			if rcpt != nil {
+				flag = true
+			}
+			if time.Since(start).Seconds() > 120 {
+				flag = true
+			}
+		}
+		if rcpt != nil {
+			// good. so the txn has been processed but we have to account for failed
+			// but valid txn like some contract condition causing revert
+			if rcpt.Status > 0 {
+				// all good to update order state
+				go wallet.callListeners(wallet.createTxnCallback(hash.Hex(), referenceID, amount, time.Now()))
+			} else {
+				// there was some error processing this txn
+				nonce, err := wallet.client.GetTxnNonce(hash.Hex())
+				if err == nil {
+					data, err := SerializePendingTxn(PendingTxn{
+						TxnID:   hash,
+						Amount:  amount,
+						OrderID: referenceID,
+						Nonce:   nonce,
+					})
+					if err == nil {
+						wallet.db.Txns().Put(data, hash.Hex(), 0, 0, time.Now(), true)
+					}
+				}
+
+				return nil, errors.New("transaction pending")
+			}
 		}
 	}
 
@@ -463,6 +523,35 @@ func (wallet *EthereumWallet) callListeners(txnCB wi.TransactionCallback) {
 	for _, l := range wallet.listeners {
 		go l(txnCB)
 	}
+}
+
+// CheckTxnRcpt check the txn rcpt status
+func (wallet *EthereumWallet) CheckTxnRcpt(hash *common.Hash, data []byte) (*common.Hash, error) {
+
+	var rcpt *types.Receipt
+	pTxn, err := DeserializePendingTxn(data)
+	if err != nil {
+		return nil, err
+	}
+
+	rcpt, err = wallet.client.TransactionReceipt(context.Background(), *hash)
+
+	if rcpt != nil {
+		// good. so the txn has been processed but we have to account for failed
+		// but valid txn like some contract condition causing revert
+		if rcpt.Status > 0 {
+			// all good to update order state
+			chash, err := chainhash.NewHashFromStr((*hash).Hex())
+			if err != nil {
+				return nil, err
+			}
+			wallet.db.Txns().Delete(chash)
+			go wallet.callListeners(wallet.createTxnCallback(hash.Hex(), pTxn.OrderID, pTxn.Amount, time.Now()))
+		}
+	}
+
+	return hash, nil
+
 }
 
 // BumpFee - Bump the fee for the given transaction

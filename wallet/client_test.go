@@ -1,6 +1,7 @@
 package wallet
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 	"testing"
@@ -61,7 +62,7 @@ func setup() {
 
 	invalidurlsTest = map[string]bool{
 		fmt.Sprintf("innet.infura.io/%s", invalidInfuraKey): false,
-		"innet.infura.io/":                                  false,
+		"innet.infura.io/": false,
 	}
 
 	logicallyinvalidurlsTest = map[string]bool{
@@ -458,4 +459,31 @@ func TestTransfer(t *testing.T) {
 	if val.Cmp(value) != 0 {
 		t.Errorf("client should have transferred balance")
 	}
+}
+
+func TestEthGasStationFetch(t *testing.T) {
+	client, err := NewEthClient(validRinkebyURL)
+	if err != nil {
+		t.Errorf("client should have initialized")
+	}
+
+	data, err := client.GetEthGasStationEstimate()
+
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	spew.Dump(data)
+	fmt.Println("avg : ", int64(data.Average*1000000000))
+
+	est, err := client.SuggestGasPrice(context.Background())
+
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	fmt.Println(est.Int64())
+
 }
