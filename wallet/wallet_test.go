@@ -75,7 +75,7 @@ func setupEthRedeemScript(timeout time.Duration, threshold int) {
 
 func setupCoinConfigRopsten() {
 	clientURL, _ := url.Parse("https://ropsten.infura.io")
-	cfg.ClientAPI = *clientURL
+	cfg.ClientAPIs = []string{(*clientURL).String()}
 	cfg.CoinType = wi.Ethereum
 	cfg.Options = make(map[string]interface{})
 	//cfg.Options["RegistryAddress"] = "0x029d6a0cd4ce98315690f4ea52945545d9c0f460"
@@ -84,7 +84,7 @@ func setupCoinConfigRopsten() {
 
 func setupCoinConfigRinkeby() {
 	clientURL, _ := url.Parse("https://rinkeby.infura.io")
-	cfg.ClientAPI = *clientURL
+	cfg.ClientAPIs = []string{(*clientURL).String()}
 	cfg.CoinType = wi.Ethereum
 	cfg.Options = make(map[string]interface{})
 	cfg.Options["RegistryAddress"] = "0x403d907982474cdd51687b09a8968346159378f3" //"0xab8dd0e05b73529b440d9c9df00b5f490c8596ff"
@@ -223,7 +223,7 @@ func TestWalletTransfer(t *testing.T) {
 	fmt.Println("rcpt")
 	spew.Dump(rcpt)
 
-	//_, err = chainhash.NewHashFromStr(hash.String())
+	//_, err = chainhash.NewHashFromStr(hash.Hex()[2:])
 
 	//if err != nil {
 	//	t.Errorf("wallet should return a valid transaction")
@@ -399,7 +399,7 @@ func TestWalletContractAddTransaction(t *testing.T) {
 	fmt.Println("returned hash : ", hash)
 	fmt.Println(err)
 
-	chash, err := chainhash.NewHashFromStr(hash.String())
+	chash, err := chainhash.NewHashFromStr(hash.Hex()[2:])
 
 	fmt.Println("err : ", err)
 
@@ -659,6 +659,8 @@ func TestWalletContractTxnHash(t *testing.T) {
 var listenerCallbackFlag bool
 
 func sampleListener(cb wi.TransactionCallback) {
+	fmt.Println("in sample listener ....")
+	spew.Dump(cb)
 	if len(cb.Outputs) > 0 && cb.Outputs[0].OrderID == magicOrderID {
 		listenerCallbackFlag = true
 	}

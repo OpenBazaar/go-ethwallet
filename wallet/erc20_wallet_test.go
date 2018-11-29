@@ -36,7 +36,7 @@ var tscript EthRedeemScript
 
 func setupTokenConfigRinkeby() {
 	clientURL, _ := url.Parse("https://rinkeby.infura.io")
-	tokenCfg.ClientAPI = *clientURL
+	cfg.ClientAPIs = []string{(*clientURL).String()}
 	tokenCfg.CoinType = wi.Ethereum
 	tokenCfg.Options = make(map[string]interface{})
 	tokenCfg.Options["RegistryAddress"] = "0x403d907982474cdd51687b09a8968346159378f3"
