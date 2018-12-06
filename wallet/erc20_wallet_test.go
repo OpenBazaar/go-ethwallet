@@ -36,7 +36,7 @@ var tscript EthRedeemScript
 
 func setupTokenConfigRinkeby() {
 	clientURL, _ := url.Parse("https://rinkeby.infura.io")
-	cfg.ClientAPIs = []string{(*clientURL).String()}
+	tokenCfg.ClientAPIs = []string{(*clientURL).String()}
 	tokenCfg.CoinType = wi.Ethereum
 	tokenCfg.Options = make(map[string]interface{})
 	tokenCfg.Options["RegistryAddress"] = "0x403d907982474cdd51687b09a8968346159378f3"
@@ -84,6 +84,19 @@ func TestNewErc20WalletWithValidCoinConfigValues(t *testing.T) {
 	if wallet.address.String() != mnemonicStrAddress {
 		t.Errorf("valid credentials should return a wallet with proper initialization")
 	}
+}
+
+func TestTokenWalletChainTip(t *testing.T) {
+	setupSourceErc20Wallet()
+
+	emptyHash, _ := chainhash.NewHashFromStr("")
+
+	tip, hash := validTokenWallet.ChainTip()
+
+	if hash.String() == emptyHash.String() {
+		t.Errorf("valid wallet should return chaintip")
+	}
+	fmt.Println("Chaintip is : ", tip)
 }
 
 func TestWalletGetTokenBalance(t *testing.T) {

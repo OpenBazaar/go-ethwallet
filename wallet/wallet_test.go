@@ -165,6 +165,19 @@ func TestNewWalletWithValidCoinConfigValues(t *testing.T) {
 	}
 }
 
+func TestWalletChainTip(t *testing.T) {
+	setupSourceWallet()
+
+	emptyHash, _ := chainhash.NewHashFromStr("")
+
+	tip, hash := validSampleWallet.ChainTip()
+
+	if hash.String() == emptyHash.String() {
+		t.Errorf("valid wallet should return chaintip")
+	}
+	fmt.Println("Chaintip is : ", tip)
+}
+
 func TestWalletGetBalance(t *testing.T) {
 	setupSourceWallet()
 
