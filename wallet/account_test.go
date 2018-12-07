@@ -88,13 +88,14 @@ func TestNewAccountWithMnemonic(t *testing.T) {
 
 func TestEthAddress(t *testing.T) {
 	setupAddr()
-	if validEthAddr.String() != validSourceAddress {
+	//fmt.Println(validEthAddr.String())
+	if validEthAddr.String() != validSourceAddress[2:] {
 		t.Errorf("address not initialized correctly")
 	}
 	if !bytes.Equal(validEthAddr.ScriptAddress(), []byte{192, 180, 239, 158, 157, 40, 6, 246, 67, 190, 148, 210, 67, 78, 92, 61, 92, 236, 210, 85}) {
 		t.Errorf("address not initialized correctly")
 	}
-	if validEthAddr.EncodeAddress() != validSourceAddress {
+	if validEthAddr.EncodeAddress() != validSourceAddress[2:] {
 		t.Errorf("address not initialized correctly")
 	}
 }

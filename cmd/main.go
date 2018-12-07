@@ -78,7 +78,7 @@ func main() {
 	var myAccount *wallet.Account
 	myAccount, err = wallet.NewAccountFromKeyfile(keyFile, password)
 	if err != nil {
-		log.Fatal("key file validation failed:%s", err.Error())
+		log.Fatalf("key file validation failed: %v", err.Error())
 	}
 	fmt.Println(myAccount.Address().String())
 
@@ -92,7 +92,7 @@ func main() {
 	destKeyFile := "./UTC--2018-06-16T20-09-33.726552102Z--cecb952de5b23950b15bfd49302d1bdd25f9ee67"
 	destAccount, err = wallet.NewAccountFromKeyfile(destKeyFile, password)
 	if err != nil {
-		log.Fatal("key file validation failed:%s", err.Error())
+		log.Fatalf("key file validation failed: %s", err.Error())
 	}
 	fmt.Println(destAccount.Address().String())
 

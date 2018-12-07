@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/ethereum/go-ethereum/common"
@@ -374,7 +375,7 @@ func TestTransfer(t *testing.T) {
 		t.Errorf("account should have initialized")
 	}
 	dest := common.HexToAddress(validDestinationAddress)
-	value := big.NewInt(200000)
+	value := big.NewInt(20000000000000)
 
 	var bal1, bal2, sbal1, dbal1, sbal2, dbal2, val *big.Int
 	var txn *types.Transaction
@@ -392,7 +393,7 @@ func TestTransfer(t *testing.T) {
 	sbal1 = big.NewInt(0)
 
 	// get the source balance
-	sbal1.Add(bal1, bal2)
+	sbal1.Add(bal1, big.NewInt(0))
 
 	bal1, err = client.GetBalance(dest)
 	if err != nil {
@@ -407,7 +408,7 @@ func TestTransfer(t *testing.T) {
 	dbal1 = big.NewInt(0)
 
 	// get the dest balance
-	dbal1.Add(bal1, bal2)
+	dbal1.Add(bal1, big.NewInt(0))
 
 	hash, err := client.Transfer(account, dest, value)
 	if err != nil {
@@ -433,10 +434,12 @@ func TestTransfer(t *testing.T) {
 		t.Errorf("client should have fetched balance")
 	}
 
+	time.Sleep(2 * time.Minute)
+
 	sbal2 = big.NewInt(0)
 
 	// get the source balance
-	sbal2.Add(bal1, bal2)
+	sbal2.Add(bal1, big.NewInt(0))
 
 	bal1, err = client.GetBalance(dest)
 	if err != nil {
@@ -452,9 +455,11 @@ func TestTransfer(t *testing.T) {
 	val = big.NewInt(0)
 
 	// get the dest balance
-	dbal2.Add(bal1, bal2)
+	dbal2.Add(bal1, big.NewInt(0))
 
 	val.Sub(dbal2, dbal1)
+
+	fmt.Println("before : ", dbal1.Int64(), " after : ", dbal2.Int64(), "   value : ", value.Int64())
 
 	if val.Cmp(value) != 0 {
 		t.Errorf("client should have transferred balance")

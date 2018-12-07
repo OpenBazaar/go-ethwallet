@@ -339,10 +339,10 @@ func (wallet *EthereumWallet) NewAddress(purpose wi.KeyPurpose) btcutil.Address 
 // DecodeAddress - Parse the address string and return an address interface
 func (wallet *EthereumWallet) DecodeAddress(addr string) (btcutil.Address, error) {
 	ethAddr := common.HexToAddress(addr)
-	if wallet.HasKey(EthAddress{&ethAddr}) {
-		return *wallet.address, nil
-	}
-	return EthAddress{}, errors.New("invalid or unknown address")
+	//if wallet.HasKey(EthAddress{&ethAddr}) {
+	//		return *wallet.address, nil
+	//	}
+	return EthAddress{&ethAddr}, nil
 }
 
 // ScriptToAddress - ?

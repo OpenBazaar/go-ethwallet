@@ -139,7 +139,7 @@ func TestNewWalletWithValidKeyfileValues(t *testing.T) {
 	if wallet == nil {
 		t.Errorf("valid credentials should return a wallet")
 	}
-	if wallet.address.String() != validSourceAddress {
+	if wallet.address.String() != validSourceAddress[2:] {
 		t.Errorf("valid credentials should return a wallet with proper initialization")
 	}
 }
@@ -160,7 +160,7 @@ func TestNewWalletWithValidCoinConfigValues(t *testing.T) {
 	}
 	fmt.Println(wallet.address.String())
 	fmt.Println(validSourceAddress)
-	if wallet.address.String() != mnemonicStrAddress {
+	if wallet.address.String() != mnemonicStrAddress[2:] {
 		t.Errorf("valid credentials should return a wallet with proper initialization")
 	}
 }
@@ -309,7 +309,7 @@ func TestWalletNewAddress(t *testing.T) {
 
 	addr := validSampleWallet.NewAddress(wi.EXTERNAL)
 
-	if addr.String() != mnemonicStrAddress {
+	if addr.String() != mnemonicStrAddress[2:] {
 		t.Errorf("wallet should return correct new address")
 	}
 }

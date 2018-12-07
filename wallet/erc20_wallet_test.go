@@ -81,7 +81,7 @@ func TestNewErc20WalletWithValidCoinConfigValues(t *testing.T) {
 	}
 	fmt.Println(wallet.address.String())
 	fmt.Println(validSourceAddress)
-	if wallet.address.String() != mnemonicStrAddress {
+	if wallet.address.String() != mnemonicStrAddress[2:] {
 		t.Errorf("valid credentials should return a wallet with proper initialization")
 	}
 }
@@ -140,7 +140,7 @@ func TestTokenWalletCurrentAddress(t *testing.T) {
 
 	addr := validTokenWallet.CurrentAddress(wi.EXTERNAL)
 
-	if addr.String() != mnemonicStrAddress {
+	if addr.String() != mnemonicStrAddress[2:] {
 		t.Errorf("wallet should return correct current address")
 	}
 }
@@ -150,7 +150,7 @@ func TestTokenWalletNewAddress(t *testing.T) {
 
 	addr := validTokenWallet.NewAddress(wi.EXTERNAL)
 
-	if addr.String() != mnemonicStrAddress {
+	if addr.String() != mnemonicStrAddress[2:] {
 		t.Errorf("wallet should return correct new address")
 	}
 }
