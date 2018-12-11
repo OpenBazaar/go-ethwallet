@@ -139,7 +139,7 @@ func TestNewWalletWithValidKeyfileValues(t *testing.T) {
 	if wallet == nil {
 		t.Errorf("valid credentials should return a wallet")
 	}
-	if wallet.address.String() != validSourceAddress[2:] {
+	if wallet.address.String() != validSourceAddress {
 		t.Errorf("valid credentials should return a wallet with proper initialization")
 	}
 }
@@ -160,7 +160,7 @@ func TestNewWalletWithValidCoinConfigValues(t *testing.T) {
 	}
 	fmt.Println(wallet.address.String())
 	fmt.Println(validSourceAddress)
-	if wallet.address.String() != mnemonicStrAddress[2:] {
+	if wallet.address.String() != mnemonicStrAddress {
 		t.Errorf("valid credentials should return a wallet with proper initialization")
 	}
 }
@@ -309,7 +309,7 @@ func TestWalletNewAddress(t *testing.T) {
 
 	addr := validSampleWallet.NewAddress(wi.EXTERNAL)
 
-	if addr.String() != mnemonicStrAddress[2:] {
+	if addr.String() != mnemonicStrAddress {
 		t.Errorf("wallet should return correct new address")
 	}
 }
@@ -704,5 +704,21 @@ func TestWalletSpend(t *testing.T) {
 	if !listenerCallbackFlag {
 		t.Errorf("spend is not calling back correctly")
 	}
+
+}
+
+// GOCACHE=off go test -v ./... -run TestWalletGetConfirmations -count=1
+func TestWalletGetConfirmations(t *testing.T) {
+	setupSourceWallet()
+	thash := "0x5315bbdb8b6370244ffb6fc41bf275e785355e567759fb15e85df6508eff9b35"
+	chainHash, err := chainhash.NewHashFromStr(thash[2:])
+	if err != nil {
+		t.Error("chainhash not initialized properly")
+	}
+	conf, ht, err := validSampleWallet.GetConfirmations(*chainHash)
+	if err != nil {
+		t.Error("chainhash not initialized properly")
+	}
+	fmt.Println("confs : ", conf, " height : ", ht)
 
 }
