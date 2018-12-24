@@ -194,6 +194,26 @@ func TestWalletGetUnconfirmedBalance(t *testing.T) {
 	}
 }
 
+//$ GOCACHE=off go test -v ./... -run TestWalletGetTransaction -count=1
+func TestWalletGetTransaction(t *testing.T) {
+	setupSourceWallet()
+
+	txID := "8a0f98762bd7be13a7a17ce45540110f2ca7cf7bda7397daff1532028a9bbe4d"
+	cHash, err := chainhash.NewHashFromStr(txID)
+
+	if err != nil {
+		t.Errorf("chainhash should be created froma 32 byte string")
+	}
+
+	txn, err := validSampleWallet.GetTransaction(*cHash)
+	if err != nil {
+		t.Errorf("wallet should fetch a txn from valid chainhash")
+	}
+
+	spew.Dump(txn)
+
+}
+
 func TestWalletTransfer(t *testing.T) {
 	//t.SkipNow()
 	setupSourceWallet()
