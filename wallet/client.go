@@ -17,7 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto/sha3"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/hunterlong/tokenbalance"
 	"github.com/nanmu42/etherscan-api"
@@ -59,7 +59,7 @@ func NewEthClient(url string) (*EthClient, error) {
 }
 
 // Transfer will transfer eth from this user account to dest address
-func (client *EthClient) Transfer(from *Account, destAccount common.Address, value *big.Int) (common.Hash, error) {
+func (client *EthClient) Transfer(from *Account, destAccount common.Address, value *big.Int, spendAll bool) (common.Hash, error) {
 	var err error
 	fromAddress := from.Address()
 	nonce, err := client.PendingNonceAt(context.Background(), fromAddress)
@@ -72,20 +72,36 @@ func (client *EthClient) Transfer(from *Account, destAccount common.Address, val
 		return common.BytesToHash([]byte{}), err
 	}
 
-	msg := ethereum.CallMsg{From: fromAddress, Value: value}
+	tvalue := value
+
+	msg := ethereum.CallMsg{From: fromAddress, Value: tvalue}
 	gasLimit, err := client.EstimateGas(context.Background(), msg)
 	if err != nil {
 		return common.BytesToHash([]byte{}), err
 	}
 
-	rawTx := types.NewTransaction(nonce, destAccount, value, gasLimit, gasPrice, nil)
+	// if spend all then we need to set the value = confirmedBalance - gas
+	if spendAll {
+		currentBalance, err := client.GetBalance(fromAddress)
+		if err != nil {
+			//currentBalance = big.NewInt(0)
+			return common.BytesToHash([]byte{}), err
+		}
+		gas := new(big.Int).Mul(gasPrice, big.NewInt(int64(gasLimit)))
+
+		if currentBalance.Cmp(gas) >= 0 {
+			tvalue = new(big.Int).Sub(currentBalance, gas)
+		}
+	}
+
+	rawTx := types.NewTransaction(nonce, destAccount, tvalue, gasLimit, gasPrice, nil)
 	signedTx, err := from.SignTransaction(types.HomesteadSigner{}, rawTx)
 	if err != nil {
 		return common.BytesToHash([]byte{}), err
 	}
 	txns = append(txns, wi.Txn{
 		Txid:      signedTx.Hash().Hex(),
-		Value:     value.Int64(),
+		Value:     tvalue.String(),
 		Height:    int32(nonce),
 		Timestamp: time.Now(),
 		WatchOnly: false,
@@ -112,9 +128,7 @@ func (client *EthClient) TransferToken(from *Account, toAddress common.Address, 
 	}
 
 	transferFnSignature := []byte("transfer(address,uint256)")
-	hash := sha3.NewKeccak256()
-	hash.Write(transferFnSignature)
-	methodID := hash.Sum(nil)[:4]
+	methodID := crypto.Keccak256(transferFnSignature)[:4]
 
 	fmt.Printf("Method ID: %s\n", hexutil.Encode(methodID))
 
@@ -146,7 +160,7 @@ func (client *EthClient) TransferToken(from *Account, toAddress common.Address, 
 
 	txns = append(txns, wi.Txn{
 		Txid:      signedTx.Hash().Hex(),
-		Value:     value.Int64(),
+		Value:     value.String(),
 		Height:    int32(nonce),
 		Timestamp: time.Now(),
 		WatchOnly: false,

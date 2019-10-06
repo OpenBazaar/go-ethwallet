@@ -23,7 +23,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/ethereum/go-ethereum/ethclient"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/proxy"
@@ -53,7 +52,7 @@ type ERC20Wallet struct {
 // GenTokenScriptHash - used to generate script hash for erc20 token as per
 // escrow smart contract
 func GenTokenScriptHash(script EthRedeemScript) ([32]byte, string, error) {
-	ahash := sha3.NewKeccak256()
+	//ahash := sha3.NewKeccak256()
 	a := make([]byte, 4)
 	binary.BigEndian.PutUint32(a, script.Timeout)
 	arr := append(script.TxnID.Bytes(), append([]byte{script.Threshold},
@@ -61,10 +60,11 @@ func GenTokenScriptHash(script EthRedeemScript) ([32]byte, string, error) {
 			append(script.Seller.Bytes(), append(script.Moderator.Bytes(),
 				append(script.MultisigAddress.Bytes(),
 					script.TokenAddress.Bytes()...)...)...)...)...)...)...)
-	ahash.Write(arr)
+	//ahash.Write(arr)
 	var retHash [32]byte
 
-	copy(retHash[:], ahash.Sum(nil)[:])
+	//copy(retHash[:], ahash.Sum(nil)[:])
+	copy(retHash[:], crypto.Keccak256(arr))
 	ahashStr := hexutil.Encode(retHash[:])
 
 	return retHash, ahashStr, nil
@@ -100,7 +100,7 @@ func NewERC20Wallet(cfg config.CoinConfig, params *chaincfg.Params, mnemonic str
 	var regAddr interface{}
 	var ok bool
 	if regAddr, ok = cfg.Options["RegistryAddress"]; !ok {
-		log.Errorf("ethereum registry not found: %s", err.Error())
+		log.Errorf("ethereum registry not found: %s", cfg.Options["RegistryAddress"])
 		return nil, err
 	}
 
@@ -118,21 +118,21 @@ func NewERC20Wallet(cfg config.CoinConfig, params *chaincfg.Params, mnemonic str
 
 	var name, symbol, deployAddrMain, deployAddrRopsten, deployAddrRinkeby interface{}
 	if name, ok = cfg.Options["Name"]; !ok {
-		log.Errorf("erc20 token name not found: %s", err.Error())
+		log.Errorf("erc20 token name not found: %s", cfg.Options["Name"])
 		return nil, err
 	}
 
 	token.name = name.(string)
 
 	if symbol, ok = cfg.Options["Symbol"]; !ok {
-		log.Errorf("erc20 token symbol not found: %s", err.Error())
+		log.Errorf("erc20 token symbol not found: %s", cfg.Options["Symbol"])
 		return nil, err
 	}
 
 	token.symbol = symbol.(string)
 
 	if deployAddrMain, ok = cfg.Options["MainNetAddress"]; !ok {
-		log.Errorf("erc20 token address not found: %s", err.Error())
+		log.Errorf("erc20 token address not found: %s", cfg.Options["MainNetAddress"])
 		return nil, err
 	}
 
@@ -299,7 +299,7 @@ func (wallet *ERC20Wallet) Transactions() ([]wi.Txn, error) {
 		}
 		tnew := wi.Txn{
 			Txid:          t.Hash,
-			Value:         t.Value.Int().Int64(),
+			Value:         t.Value.Int().String(),
 			Height:        int32(t.BlockNumber),
 			Timestamp:     t.TimeStamp.Time(),
 			WatchOnly:     false,
@@ -321,7 +321,7 @@ func (wallet *ERC20Wallet) GetTransaction(txid chainhash.Hash) (wi.Txn, error) {
 	}
 	return wi.Txn{
 		Txid:      tx.Hash().String(),
-		Value:     tx.Value().Int64(),
+		Value:     tx.Value().String(),
 		Height:    0,
 		Timestamp: time.Now(),
 		WatchOnly: false,
@@ -346,7 +346,7 @@ func (wallet *ERC20Wallet) GetFeePerByte(feeLevel wi.FeeLevel) uint64 {
 }
 
 // Spend - Send ether to an external wallet
-func (wallet *ERC20Wallet) Spend(amount int64, addr btcutil.Address, feeLevel wi.FeeLevel, referenceID string) (*chainhash.Hash, error) {
+func (wallet *ERC20Wallet) Spend(amount big.Int, addr btcutil.Address, feeLevel wi.FeeLevel, referenceID string) (*chainhash.Hash, error) {
 	var hash common.Hash
 	var h *chainhash.Hash
 	var err error
@@ -373,12 +373,12 @@ func (wallet *ERC20Wallet) Spend(amount int64, addr btcutil.Address, feeLevel wi
 		if err != nil {
 			return nil, err
 		}
-		hash, err = wallet.callAddTokenTransaction(ethScript, big.NewInt(amount))
+		hash, err = wallet.callAddTokenTransaction(ethScript, &amount)
 		if err != nil {
 			log.Errorf("error call add token txn: %v", err)
 		}
 	} else {
-		hash, err = wallet.Transfer(addr.String(), big.NewInt(amount))
+		hash, err = wallet.Transfer(addr.String(), &amount)
 	}
 
 	if err != nil {
@@ -414,7 +414,7 @@ func (wallet *ERC20Wallet) Spend(amount int64, addr btcutil.Address, feeLevel wi
 	return h, err
 }
 
-func (wallet *ERC20Wallet) createTxnCallback(txID, orderID string, toAddress btcutil.Address, value int64, bTime time.Time) wi.TransactionCallback {
+func (wallet *ERC20Wallet) createTxnCallback(txID, orderID string, toAddress btcutil.Address, value big.Int, bTime time.Time) wi.TransactionCallback {
 	output := wi.TransactionOutput{
 		Address: toAddress,
 		Value:   value,
@@ -458,7 +458,7 @@ func (wallet *ERC20Wallet) EstimateFee(ins []wi.TransactionInput, outs []wi.Tran
 	sum := big.NewInt(0)
 	for _, out := range outs {
 		gas, err := wallet.client.EstimateTxnGas(wallet.account.Address(),
-			common.HexToAddress(out.Address.String()), big.NewInt(out.Value))
+			common.HexToAddress(out.Address.String()), &out.Value)
 		if err != nil {
 			return sum.Uint64()
 		}
@@ -664,9 +664,9 @@ func (wallet *ERC20Wallet) GenerateMultisigScript(keys []hd.ExtendedKey, thresho
 		return nil, nil, err
 	}
 
-	hash := sha3.NewKeccak256()
-	hash.Write(redeemScript)
-	addr := common.HexToAddress(hexutil.Encode(hash.Sum(nil)[:]))
+	//hash := sha3.NewKeccak256()
+	//hash.Write(redeemScript)
+	addr := common.HexToAddress(hexutil.Encode(crypto.Keccak256(redeemScript)))
 	retAddr := EthAddress{&addr}
 
 	scriptKey := append(addr.Bytes(), redeemScript...)
@@ -682,10 +682,10 @@ func (wallet *ERC20Wallet) CreateMultisigSignature(ins []wi.TransactionInput, ou
 
 	payables := make(map[string]*big.Int)
 	for _, out := range outs {
-		if out.Value <= 0 {
+		if out.Value.Cmp(big.NewInt(0)) <= 0 {
 			continue
 		}
-		val := big.NewInt(out.Value)
+		val := &out.Value
 		if p, ok := payables[out.Address.String()]; ok {
 			sum := big.NewInt(0)
 			sum.Add(val, p)
@@ -775,10 +775,10 @@ func (wallet *ERC20Wallet) Multisign(ins []wi.TransactionInput, outs []wi.Transa
 
 	payables := make(map[string]*big.Int)
 	for _, out := range outs {
-		if out.Value <= 0 {
+		if out.Value.Cmp(big.NewInt(0)) <= 0 {
 			continue
 		}
-		val := big.NewInt(out.Value)
+		val := &out.Value
 		if p, ok := payables[out.Address.String()]; ok {
 			sum := big.NewInt(0)
 			sum.Add(val, p)
