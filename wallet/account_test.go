@@ -71,7 +71,7 @@ func TestNewAccountWithInValidCredentials(t *testing.T) {
 }
 
 func TestNewAccountWithMnemonic(t *testing.T) {
-	account, err := NewAccountFromMnemonic(mnemonicStr, "")
+	account, err := NewAccountFromMnemonic(mnemonicStr, "", nil)
 	if err != nil {
 		t.Errorf("failed to open account from mnemonic: %v", err)
 	}

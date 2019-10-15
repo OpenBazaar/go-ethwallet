@@ -20,7 +20,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/crypto/sha3"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/OpenBazaar/go-ethwallet/util"
@@ -359,70 +358,6 @@ func TestWalletContractAddTransaction(t *testing.T) {
 
 	fmt.Println(redeemScript)
 
-	/*
-
-		hash := sha3.NewKeccak256()
-		hash.Write(redeemScript)
-		hashStr := hexutil.Encode(hash.Sum(nil)[:])
-		shash1 := crypto.Keccak256(redeemScript)
-		shash1Str := hexutil.Encode(shash1)
-		fmt.Println("hashStr : ", hashStr)
-		fmt.Println("shash1Str : ", shash1Str)
-		addr := common.HexToAddress(hashStr)
-		var shash [32]byte
-		copy(shash[:], addr.Bytes())
-
-		var s1 [32]byte
-		var s2 [32]byte
-
-		copy(s1[:], hash.Sum(nil)[:])
-		copy(s2[:], shash1)
-
-		fmt.Println("s1 and s2 are equal? : ", bytes.Equal(s1[:], s2[:]))
-
-		fromAddress := validSampleWallet.account.Address()
-		nonce, err := validSampleWallet.client.PendingNonceAt(context.Background(), fromAddress)
-		if err != nil {
-			log.Fatal(err)
-		}
-		gasPrice, err := validSampleWallet.client.SuggestGasPrice(context.Background())
-		if err != nil {
-			log.Fatal(err)
-		}
-		auth := bind.NewKeyedTransactor(validSampleWallet.account.privateKey)
-
-		auth.Nonce = big.NewInt(int64(nonce))
-		auth.Value = big.NewInt(66778899) // in wei
-		auth.GasLimit = 4000000           // in units
-		auth.GasPrice = gasPrice
-
-		fmt.Println("buyer : ", script.Buyer)
-		fmt.Println("seller : ", script.Seller)
-		fmt.Println("moderator : ", script.Moderator)
-		fmt.Println("threshold : ", script.Threshold)
-		fmt.Println("timeout : ", script.Timeout)
-		fmt.Println("scrptHash : ", shash)
-
-		smtct, err := NewEscrow(ver.Implementation, validSampleWallet.client)
-		if err != nil {
-			t.Errorf("error initilaizing contract failed: %s", err.Error())
-		}
-
-		var tx *types.Transaction
-
-		if script.Threshold == 1 {
-			tx, err = smtct.AddTransaction(auth, script.Buyer, script.Seller,
-				common.BigToAddress(big.NewInt(0)), script.Threshold, script.Timeout, shash, script.TxnID)
-		} else {
-			tx, err = smtct.AddTransaction(auth, script.Buyer, script.Seller,
-				script.Moderator, script.Threshold, script.Timeout, shash, script.TxnID)
-		}
-
-		fmt.Println(tx)
-		fmt.Println(err)
-
-	*/
-
 	spew.Dump(script)
 
 	orderValue := big.NewInt(34567812347878)
@@ -530,7 +465,7 @@ func TestWalletContractScriptHash(t *testing.T) {
 	rethash1Str := hexutil.Encode(retHash[:])
 	fmt.Println("rethash1Str : ", rethash1Str)
 
-	ahash := sha3.NewKeccak256()
+	ahash := crypto.NewKeccak256()
 	a := make([]byte, 4)
 	binary.BigEndian.PutUint32(a, script.Timeout)
 	arr := append(script.TxnID.Bytes(), append([]byte{script.Threshold},
@@ -631,7 +566,7 @@ func TestWalletContractTxnHash(t *testing.T) {
 	//p1 = append(p1, at2...)
 	p1 = append(p1, b1...)
 
-	ahash := sha3.NewKeccak256()
+	ahash := crypto.NewKeccak256()
 	//a := make([]byte, 4)
 	//binary.BigEndian.PutUint32(a, script.Timeout)
 	//arr := append(script.TxnID.Bytes(), append([]byte{script.Threshold},
@@ -740,5 +675,33 @@ func TestWalletGetConfirmations(t *testing.T) {
 		t.Error("chainhash not initialized properly")
 	}
 	fmt.Println("confs : ", conf, " height : ", ht)
+
+}
+
+func TestWalletDecodeAddress(t *testing.T) {
+	setupSourceWallet()
+	d, _ := time.ParseDuration("1h")
+	setupEthRedeemScript(d, 1)
+
+	script.MultisigAddress = ver.Implementation
+
+	redeemScript, err := SerializeEthScript(script)
+	if err != nil {
+		t.Error("error serializing redeem script")
+	}
+	_, sHash, err := GenScriptHash(script)
+	if err != nil {
+		t.Error("error generating script hash for redeem script")
+	}
+
+	addr, err := validSampleWallet.DecodeAddress(validDestinationAddress)
+	if err != nil || addr.String() != validDestinationAddress {
+		t.Error("error decoding valid address")
+	}
+
+	notAddr, err := validSampleWallet.DecodeAddress(string(redeemScript))
+	if err != nil || notAddr.String() != sHash {
+		t.Error("error decoding redeem script hash address")
+	}
 
 }

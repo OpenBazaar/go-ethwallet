@@ -410,7 +410,7 @@ func TestTransfer(t *testing.T) {
 	// get the dest balance
 	dbal1.Add(bal1, big.NewInt(0))
 
-	hash, err := client.Transfer(account, dest, value)
+	hash, err := client.Transfer(account, dest, value, false)
 	if err != nil {
 		t.Errorf("client should transfer : %v", err)
 	}

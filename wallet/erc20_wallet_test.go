@@ -21,7 +21,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/ethereum/go-ethereum/ethclient"
 	log "github.com/sirupsen/logrus"
 
@@ -70,12 +69,12 @@ func setupERCTokenRedeemScript(timeout time.Duration, threshold int) {
 
 func setupSourceErc20Wallet() {
 	setupTokenConfigRinkeby()
-	validTokenWallet, _ = NewERC20Wallet(tokenCfg, mnemonicStr, nil)
+	validTokenWallet, _ = NewERC20Wallet(tokenCfg, nil, mnemonicStr, nil)
 }
 
 func TestNewErc20WalletWithValidCoinConfigValues(t *testing.T) {
 	setupTokenConfigRinkeby()
-	wallet, err := NewERC20Wallet(tokenCfg, mnemonicStr, nil)
+	wallet, err := NewERC20Wallet(tokenCfg, nil, mnemonicStr, nil)
 	if err != nil || wallet == nil {
 		t.Errorf("valid credentials should return a wallet")
 	}
@@ -202,7 +201,7 @@ func TestTokenWalletContractAddTransaction(t *testing.T) {
 
 	output := wi.TransactionOutput{
 		Address: EthAddress{&tscript.Seller},
-		Value:   orderValue.Int64(),
+		Value:   *orderValue,
 		Index:   1,
 	}
 
@@ -425,7 +424,7 @@ func TestTokenWalletContractScriptHash(t *testing.T) {
 	rethash1Str := hexutil.Encode(retHash[:])
 	fmt.Println("rethash1Str : ", rethash1Str)
 
-	ahash := sha3.NewKeccak256()
+	ahash := crypto.NewKeccak256()
 	a := make([]byte, 4)
 	binary.BigEndian.PutUint32(a, tscript.Timeout)
 	arr := append(tscript.TxnID.Bytes(), append([]byte{tscript.Threshold},
