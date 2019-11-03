@@ -463,7 +463,7 @@ func (wallet *EthereumWallet) Balance() (confirmed, unconfirmed wi.CurrencyValue
 
 // Transactions - Returns a list of transactions for this wallet
 func (wallet *EthereumWallet) Transactions() ([]wi.Txn, error) {
-	txns, err := wallet.client.eClient.NormalTxByAddress(wallet.account.Address().String(), nil, nil,
+	txns, err := wallet.client.eClient.NormalTxByAddress(util.EnsureCorrectPrefix(wallet.account.Address().String()), nil, nil,
 		1, 0, true)
 	if err != nil {
 		log.Error("err fetching transactions : ", err)
@@ -477,7 +477,7 @@ func (wallet *EthereumWallet) Transactions() ([]wi.Txn, error) {
 			status = wi.StatusError
 		}
 		tnew := wi.Txn{
-			Txid:          t.Hash,
+			Txid:          util.EnsureCorrectPrefix(t.Hash),
 			Value:         t.Value.Int().String(),
 			Height:        int32(t.BlockNumber),
 			Timestamp:     t.TimeStamp.Time(),
@@ -494,7 +494,7 @@ func (wallet *EthereumWallet) Transactions() ([]wi.Txn, error) {
 
 // GetTransaction - Get info on a specific transaction
 func (wallet *EthereumWallet) GetTransaction(txid chainhash.Hash) (wi.Txn, error) {
-	tx, _, err := wallet.client.GetTransaction(common.HexToHash(txid.String()))
+	tx, _, err := wallet.client.GetTransaction(common.HexToHash(util.EnsureCorrectPrefix(txid.String())))
 	if err != nil {
 		return wi.Txn{}, err
 	}
@@ -528,14 +528,14 @@ func (wallet *EthereumWallet) GetTransaction(txid chainhash.Hash) (wi.Txn, error
 	}
 
 	return wi.Txn{
-		Txid:        tx.Hash().Hex(),
+		Txid:        util.EnsureCorrectPrefix(tx.Hash().Hex()),
 		Value:       tx.Value().String(),
 		Height:      0,
 		Timestamp:   time.Now(),
 		WatchOnly:   false,
 		Bytes:       tx.Data(),
-		ToAddress:   tx.To().String(),
-		FromAddress: msg.From().Hex(),
+		ToAddress:   util.EnsureCorrectPrefix(tx.To().String()),
+		FromAddress: util.EnsureCorrectPrefix(msg.From().Hex()),
 		Outputs: []wi.TransactionOutput{
 			{
 				Address: EthAddress{toAddr},
@@ -563,7 +563,10 @@ func (wallet *EthereumWallet) ChainTip() (uint32, chainhash.Hash) {
 	if err != nil {
 		return 0, *h
 	}
-	h, _ = chainhash.NewHashFromStr(hash.Hex()[2:])
+	h, err = util.CreateChainHash(hash.Hex())
+	if err != nil {
+		log.Error(err)
+	}
 	return num, *h
 }
 
@@ -581,7 +584,34 @@ func (wallet *EthereumWallet) Spend(amount big.Int, addr btcutil.Address, feeLev
 
 	if referenceID == "" {
 		// no referenceID means this is a direct transfer
-		hash, err = wallet.Transfer(addr.String(), &amount, spendAll)
+		hash, err = wallet.Transfer(util.EnsureCorrectPrefix(addr.String()), &amount, spendAll)
+		//time.Sleep(60 * time.Second)
+		start := time.Now()
+		flag := false
+		var rcpt *types.Receipt
+		for !flag {
+			rcpt, err = wallet.client.TransactionReceipt(context.Background(), hash)
+			if rcpt != nil {
+				flag = true
+			}
+			if time.Since(start).Seconds() > 180 {
+				flag = true
+			}
+			if err != nil {
+				log.Errorf("error fetching txn rcpt: %v", err)
+			}
+			time.Sleep(5 * time.Second)
+		}
+		if rcpt != nil {
+			// good. so the txn has been processed but we have to account for failed
+			// but valid txn like some contract condition causing revert
+			if rcpt.Status > 0 {
+				// all good to update order state
+
+			} else {
+				err = errors.New("transaction failed")
+			}
+		}
 	} else {
 		// this is a spend which means it has to be linked to an order
 		// specified using the referenceID
@@ -624,7 +654,7 @@ func (wallet *EthereumWallet) Spend(amount big.Int, addr btcutil.Address, feeLev
 				log.Errorf("error call add txn: %v", err)
 			}
 		} else {
-			hash, err = wallet.Transfer(addr.String(), &amount, spendAll)
+			hash, err = wallet.Transfer(util.EnsureCorrectPrefix(addr.String()), &amount, spendAll)
 		}
 
 		if err != nil {
@@ -651,10 +681,10 @@ func (wallet *EthereumWallet) Spend(amount big.Int, addr btcutil.Address, feeLev
 			// but valid txn like some contract condition causing revert
 			if rcpt.Status > 0 {
 				// all good to update order state
-				go wallet.AssociateTransactionWithOrder(wallet.createTxnCallback(hash.Hex(), referenceID, actualRecipient, amount, time.Now(), false))
+				go wallet.AssociateTransactionWithOrder(wallet.createTxnCallback(util.EnsureCorrectPrefix(hash.Hex()), referenceID, actualRecipient, amount, time.Now(), false))
 			} else {
 				// there was some error processing this txn
-				nonce, err := wallet.client.GetTxnNonce(hash.Hex())
+				nonce, err := wallet.client.GetTxnNonce(util.EnsureCorrectPrefix(hash.Hex()))
 				if err == nil {
 					data, err := SerializePendingTxn(PendingTxn{
 						TxnID:     hash,
@@ -679,7 +709,7 @@ func (wallet *EthereumWallet) Spend(amount big.Int, addr btcutil.Address, feeLev
 	}
 
 	if err == nil {
-		h, err = chainhash.NewHashFromStr(strings.TrimPrefix(hash.Hex(), "0x"))
+		h, err = util.CreateChainHash(hash.Hex())
 	}
 	return h, err
 }
@@ -696,7 +726,7 @@ func (wallet *EthereumWallet) createTxnCallback(txID, orderID string, toAddress 
 
 	if withInput {
 		input = wi.TransactionInput{
-			OutpointHash:  []byte(strings.TrimPrefix(txID, "0x")), //[]byte(txID[:32]),
+			OutpointHash:  []byte(util.EnsureCorrectPrefix(txID)),
 			OutpointIndex: 1,
 			LinkedAddress: toAddress,
 			Value:         value,
@@ -706,7 +736,7 @@ func (wallet *EthereumWallet) createTxnCallback(txID, orderID string, toAddress 
 	}
 
 	return wi.TransactionCallback{
-		Txid:      txID[2:],
+		Txid:      util.EnsureCorrectPrefix(txID),
 		Outputs:   []wi.TransactionOutput{output},
 		Inputs:    []wi.TransactionInput{input},
 		Height:    1,
@@ -742,16 +772,16 @@ func (wallet *EthereumWallet) CheckTxnRcpt(hash *common.Hash, data []byte) (*com
 		// but valid txn like some contract condition causing revert
 		if rcpt.Status > 0 {
 			// all good to update order state
-			chash, err := chainhash.NewHashFromStr((*hash).Hex()[2:])
+			chash, err := util.CreateChainHash((*hash).Hex())
 			if err != nil {
 				return nil, err
 			}
 			wallet.db.Txns().Delete(chash)
-			toAddr := common.HexToAddress(pTxn.To)
+			toAddr := common.HexToAddress(util.EnsureCorrectPrefix(pTxn.To))
 			n := new(big.Int)
 			n, _ = n.SetString(pTxn.Amount, 10)
 			go wallet.AssociateTransactionWithOrder(
-				wallet.createTxnCallback(hash.Hex(), pTxn.OrderID, EthAddress{&toAddr},
+				wallet.createTxnCallback(util.EnsureCorrectPrefix(hash.Hex()), pTxn.OrderID, EthAddress{&toAddr},
 					*n, time.Now(), pTxn.WithInput))
 		}
 	}
@@ -762,7 +792,7 @@ func (wallet *EthereumWallet) CheckTxnRcpt(hash *common.Hash, data []byte) (*com
 
 // BumpFee - Bump the fee for the given transaction
 func (wallet *EthereumWallet) BumpFee(txid chainhash.Hash) (*chainhash.Hash, error) {
-	return chainhash.NewHashFromStr(txid.String())
+	return util.CreateChainHash(txid.String())
 }
 
 // EstimateFee - Calculates the estimated size of the transaction and returns the total fee for the given feePerByte
@@ -818,7 +848,7 @@ func (wallet *EthereumWallet) SweepAddress(utxos []wi.TransactionInput, address 
 
 	hash := common.BytesToHash(data)
 
-	return chainhash.NewHashFromStr(hash.Hex()[2:])
+	return util.CreateChainHash(hash.Hex())
 }
 
 // ExchangeRates - return the exchangerates
@@ -1413,7 +1443,7 @@ func (wallet *EthereumWallet) GetConfirmations(txid chainhash.Hash) (confirms, a
 	// TODO: etherscan api is being used
 	// when mainnet is activated we may need a way to set the
 	// url correctly - done 6 April 2019
-	hash := common.HexToHash(txid.String())
+	hash := common.HexToHash(util.EnsureCorrectPrefix(txid.String()))
 	network := etherscan.Rinkby
 	if strings.Contains(wallet.client.url, "mainnet") {
 		network = etherscan.Mainnet
