@@ -34,7 +34,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
-	log "github.com/sirupsen/logrus"
+	"github.com/op/go-logging"
 	"golang.org/x/net/proxy"
 	"gopkg.in/yaml.v2"
 
@@ -47,12 +47,27 @@ const (
 )
 
 var (
+	emptyChainHash *chainhash.Hash
+
 	// EthCurrencyDefinition is eth defaults
 	EthCurrencyDefinition = wi.CurrencyDefinition{
 		Code:         "ETH",
 		Divisibility: 18,
 	}
+	log = logging.MustGetLogger("ethwallet")
 )
+
+func init() {
+	mustInitEmptyChainHash()
+}
+
+func mustInitEmptyChainHash() {
+	hash, err := chainhash.NewHashFromStr("")
+	if err != nil {
+		panic(fmt.Sprintf("creating emptyChainHash: %s", err.Error()))
+	}
+	emptyChainHash = hash
+}
 
 // EthConfiguration - used for eth specific configuration
 type EthConfiguration struct {
@@ -559,13 +574,13 @@ func (wallet *EthereumWallet) GetTransaction(txid chainhash.Hash) (wi.Txn, error
 // ChainTip - Get the height and best hash of the blockchain
 func (wallet *EthereumWallet) ChainTip() (uint32, chainhash.Hash) {
 	num, hash, err := wallet.client.GetLatestBlock()
-	h, _ := chainhash.NewHashFromStr("")
 	if err != nil {
-		return 0, *h
+		return 0, *emptyChainHash
 	}
-	h, err = util.CreateChainHash(hash.Hex())
+	h, err := util.CreateChainHash(hash.Hex())
 	if err != nil {
 		log.Error(err)
+		h = emptyChainHash
 	}
 	return num, *h
 }
@@ -1105,9 +1120,13 @@ func (wallet *EthereumWallet) CreateMultisigSignature(ins []wi.TransactionInput,
 	//amountStr := ""
 
 	//spew.Dump(payables)
+	log.Info("cm  payables : ", payables)
+	log.Info("cm  mbv addr : ", mbvAddresses)
 
 	for _, k := range mbvAddresses {
 		v := payables[k]
+		log.Info(" addr : ", k)
+		log.Info("amt  : ", v)
 		if v.Cmp(big.NewInt(0)) != 1 {
 			continue
 		}
@@ -1198,7 +1217,9 @@ func (wallet *EthereumWallet) CreateMultisigSignature(ins []wi.TransactionInput,
 func (wallet *EthereumWallet) Multisign(ins []wi.TransactionInput, outs []wi.TransactionOutput, sigs1 []wi.Signature, sigs2 []wi.Signature, redeemScript []byte, feePerByte big.Int, broadcast bool) ([]byte, error) {
 
 	//var buf bytes.Buffer
-	log.Info("in multisgin")
+	log.Info("in wallet multisign  ... ")
+	log.Info("ins   : ", ins)
+	log.Info("outs  : ", outs)
 
 	payouts := []wi.TransactionOutput{}
 	//delta1 := int64(0)
@@ -1320,8 +1341,13 @@ func (wallet *EthereumWallet) Multisign(ins []wi.TransactionInput, outs []wi.Tra
 	destinations := []common.Address{}
 	amounts := []*big.Int{}
 
+	log.Info("ms  payables : ", payables)
+	log.Info("ms  mbv addr : ", mbvAddresses)
+
 	for _, k := range mbvAddresses {
 		v := payables[k]
+		log.Info(" addr : ", k)
+		log.Info("amt  : ", v)
 		if v.Cmp(big.NewInt(0)) == 1 {
 			destinations = append(destinations, common.HexToAddress(k))
 			amounts = append(amounts, new(big.Int).SetBytes(v.Bytes()))
@@ -1355,7 +1381,7 @@ func (wallet *EthereumWallet) Multisign(ins []wi.TransactionInput, outs []wi.Tra
 
 	if requiredBalance.Cmp(currentBalance) > 0 {
 		// the wallet does not have the required balance
-		return nil, errors.New("insufficient balance to release funds or confirm order")
+		return nil, wi.ErrInsufficientFunds
 	}
 
 	//var tx *types.Transaction
