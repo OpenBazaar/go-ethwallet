@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"math/big"
 	"net/http"
@@ -264,7 +265,6 @@ func (client *EthClient) EstimateGasSpend(from common.Address, value *big.Int) (
 // GetTxnNonce - used to fetch nonce for a submitted txn
 func (client *EthClient) GetTxnNonce(txID string) (int32, error) {
 	txnsLock.Lock()
-	defer txnsLock.Unlock()
 	for _, txn := range txns {
 		if txn.Txid == txID {
 			return txn.Height, nil
