@@ -35,6 +35,7 @@ import (
 	"github.com/nanmu42/etherscan-api"
 	"github.com/op/go-logging"
 	"golang.org/x/net/proxy"
+	"github.com/gorilla/websocket"
 	"gopkg.in/yaml.v2"
 
 	"github.com/OpenBazaar/go-ethwallet/util"
@@ -322,7 +323,7 @@ func (wallet *EthereumWallet) Start() {
 			}
 			for _, txn := range txns {
 				hash := common.HexToHash(txn.Txid)
-				go wallet.checkTxnRcpt(&hash, txn.Bytes)
+				go wallet.CheckTxnRcpt(&hash, txn.Bytes)
 			}
 		}
 	}(wallet)
