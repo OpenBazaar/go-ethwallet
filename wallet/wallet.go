@@ -1512,7 +1512,7 @@ func (wallet *EthereumWallet) CreateAddress() (common.Address, error) {
 // PrintKeys - used to print the keys for this wallet
 func (wallet *EthereumWallet) PrintKeys() {
 	privateKeyBytes := crypto.FromECDSA(wallet.account.privateKey)
-	log.Debug(privateKeyBytes)
+	log.Debug(string(privateKeyBytes))
 	publicKey := wallet.account.privateKey.Public()
 	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
 	if !ok {
@@ -1522,7 +1522,7 @@ func (wallet *EthereumWallet) PrintKeys() {
 	publicKeyBytes := crypto.FromECDSAPub(publicKeyECDSA)
 	address := crypto.PubkeyToAddress(*publicKeyECDSA).Hex()
 	log.Debug(address)
-	log.Debug(publicKeyBytes)
+	log.Debug(string(publicKeyBytes))
 }
 
 // GenWallet creates a wallet
