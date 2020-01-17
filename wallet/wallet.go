@@ -464,7 +464,7 @@ func (wallet *EthereumWallet) DecodeAddress(addr string) (btcutil.Address, error
 	if len(addr) > 64 {
 		ethAddr, err = ethScriptToAddr(addr)
 		if err != nil {
-			log.Error(err)
+			log.Error(err.Error())
 		}
 	} else {
 		ethAddr = common.HexToAddress(addr)
@@ -638,7 +638,7 @@ func (wallet *EthereumWallet) ChainTip() (uint32, chainhash.Hash) {
 	}
 	h, err := util.CreateChainHash(hash.Hex())
 	if err != nil {
-		log.Error(err)
+		log.Error(err.Error())
 		h = emptyChainHash
 	}
 	return num, *h
@@ -702,7 +702,7 @@ func (wallet *EthereumWallet) Spend(amount big.Int, addr btcutil.Address, feeLev
 			}
 			_, scrHash, err := GenScriptHash(ethScript)
 			if err != nil {
-				log.Error(err)
+				log.Error(err.Error())
 			}
 			addrScrHash := common.HexToAddress(scrHash)
 			actualRecipient = EthAddress{address: &addrScrHash}
@@ -736,7 +736,7 @@ func (wallet *EthereumWallet) Spend(amount big.Int, addr btcutil.Address, feeLev
 			if err == nil {
 				err0 := wallet.db.Txns().Put(data, ut.NormalizeAddress(hash.Hex()), "0", 0, time.Now(), true)
 				if err0 != nil {
-					log.Error(err)
+					log.Error(err.Error())
 				}
 			}
 		}
@@ -1409,7 +1409,7 @@ func (wallet *EthereumWallet) Multisign(ins []wi.TransactionInput, outs []wi.Tra
 	// this is a pending txn
 	_, scrHash, err := GenScriptHash(rScript)
 	if err != nil {
-		log.Error(err)
+		log.Error(err.Error())
 	}
 	data, err := SerializePendingTxn(PendingTxn{
 		TxnID:   tx.Hash(),
@@ -1422,7 +1422,7 @@ func (wallet *EthereumWallet) Multisign(ins []wi.TransactionInput, outs []wi.Tra
 	if err == nil {
 		err0 := wallet.db.Txns().Put(data, ut.NormalizeAddress(tx.Hash().Hex()), "0", 0, time.Now(), true)
 		if err0 != nil {
-			log.Error(err)
+			log.Error(err.Error())
 		}
 	}
 
@@ -1503,7 +1503,7 @@ func (wallet *EthereumWallet) CreateAddress() (common.Address, error) {
 	fromAddress := wallet.account.Address()
 	nonce, err := wallet.client.PendingNonceAt(context.Background(), fromAddress)
 	if err != nil {
-		log.Error(err)
+		log.Error(err.Error())
 	}
 	addr := crypto.CreateAddress(fromAddress, nonce)
 	return addr, err
