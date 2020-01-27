@@ -198,7 +198,9 @@ func (client *EthClient) GetTokenBalance(destAccount, tokenAddress common.Addres
 		GethLocation: client.url,
 		Logs:         true,
 	}
-	configs.Connect()
+	if err := configs.Connect(); err != nil {
+		return nil, err
+	}
 
 	// insert a Token Contract address and Wallet address
 	contract := tokenAddress.String()
