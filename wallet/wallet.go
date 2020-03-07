@@ -344,7 +344,7 @@ func (wallet *EthereumWallet) processBalanceChange(previousBalance, currentBalan
 				Txid:      util.EnsureCorrectPrefix(txns[0].Txid),
 				Outputs:   []wi.TransactionOutput{},
 				Inputs:    []wi.TransactionInput{},
-				Height:    1,
+				Height:    txns[0].Height,
 				Timestamp: time.Now(),
 				Value:     *value,
 				WatchOnly: false,
@@ -1074,10 +1074,12 @@ func (wallet *EthereumWallet) CreateMultisigSignature(ins []wi.TransactionInput,
 	mbvAddresses := make([]string, 3)
 
 	for i, out := range outs {
-		if out.Address.String() == rScript.Moderator.Hex() {
+		if out.Value.Cmp(new(big.Int)) > 0 {
 			indx = append(indx, i)
+		}
+		if out.Address.String() == rScript.Moderator.Hex() {
 			mbvAddresses[0] = out.Address.String()
-		} else if out.Address.String() == rScript.Buyer.Hex() {
+		} else if out.Address.String() == rScript.Buyer.Hex() && (out.Value.Cmp(new(big.Int)) > 0) {
 			mbvAddresses[1] = out.Address.String()
 		} else {
 			mbvAddresses[2] = out.Address.String()
@@ -1228,6 +1230,9 @@ func (wallet *EthereumWallet) Multisign(ins []wi.TransactionInput, outs []wi.Tra
 	mbvAddresses := make([]string, 3)
 
 	for i, out := range outs {
+		if out.Value.Cmp(new(big.Int)) > 0 {
+			indx = append(indx, i)
+		}
 		if out.Address.String() == rScript.Moderator.Hex() {
 			indx = append(indx, i)
 			mbvAddresses[0] = out.Address.String()
@@ -1435,6 +1440,10 @@ func (wallet *EthereumWallet) GetConfirmations(txid chainhash.Hash) (confirms, a
 		return 0, 0, errors.New("invalid txn hash")
 	}
 
+	if s["message"] != nil {
+		return 0, 0, nil
+	}
+
 	result := s["result"].(map[string]interface{})
 
 	d, _ := strconv.ParseInt(result["blockNumber"].(string), 0, 64)
@@ -1446,7 +1455,7 @@ func (wallet *EthereumWallet) GetConfirmations(txid chainhash.Hash) (confirms, a
 
 	conf := n.Number.Int64() - d
 
-	return uint32(conf), uint32(n.Number.Int64()), nil
+	return uint32(conf), uint32(d), nil
 }
 
 // Close will stop the wallet daemon
